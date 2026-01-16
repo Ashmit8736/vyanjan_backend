@@ -1,8 +1,10 @@
 import mysql from "mysql2/promise";
 
+let connection; 
+
 const connectDB = async () => {
-  try {
-    const connection = await mysql.createConnection({
+  if (!connection) {
+    connection = await mysql.createConnection({
       host: process.env.DB_HOST,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
@@ -10,12 +12,8 @@ const connectDB = async () => {
     });
 
     console.log("✅ MariaDB Connected Successfully");
-    return connection;
-
-  } catch (error) {
-    console.error("❌ DB Connection Failed:", error.message);
-    process.exit(1);
   }
+  return connection;
 };
 
 export default connectDB;
