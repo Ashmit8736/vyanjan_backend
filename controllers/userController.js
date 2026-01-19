@@ -4,7 +4,8 @@ import {
   createUser,
   findUserByEmailOrPhone,
   findSubscriptionByName,
-  findUserByIdentifier
+  findUserByIdentifier,
+  getAllUsers
 } from "../models/userModel.js";
 
 export const registerUser = async (req, res) => {
@@ -107,6 +108,28 @@ export const loginUser = async (req, res) => {
       }
     });
 
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const getUsers = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 6;
+
+    const { users, total } = await getAllUsers(page, limit);
+
+    res.status(200).json({
+      success: true,
+      data: users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
