@@ -4,7 +4,9 @@ import {
   createUser,
   findUserByEmailOrPhone,
   findSubscriptionByName,
-  findUserByIdentifier
+  findUserByIdentifier,
+   getUsersPaginated, 
+   getUsersCount
 } from "../models/userModel.js";
 
 export const registerUser = async (req, res) => {
@@ -105,6 +107,35 @@ export const loginUser = async (req, res) => {
         email: user.email,
         phone: user.phone
       }
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+
+export const getAllUsers = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 6;
+    const offset = (page - 1) * limit;
+
+    const users = await getUsersPaginated(limit, offset);
+    const totalUsers = await getUsersCount();
+
+    const totalPages = Math.ceil(totalUsers / limit);
+
+    res.json({
+      success: true,
+      pagination: {
+        totalUsers,
+        totalPages,
+        currentPage: page,
+        limit
+      },
+      users
     });
 
   } catch (err) {
