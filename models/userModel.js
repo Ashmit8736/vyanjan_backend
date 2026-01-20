@@ -16,12 +16,13 @@ export const createUser = async (data) => {
   const db = await connectDB();
 
   await db.execute(
-    "CALL CreateUser(?,?,?,?,?,?,?,?,?,?,?)",
+    "CALL CreateUser(?,?,?,?,?,?,?,?,?,?,?,?)",
     [
       data.name,
       data.email,
       data.phone,
       data.password,
+       data.store_count,  
       data.gst_number,
       data.shop_name,
       data.address,

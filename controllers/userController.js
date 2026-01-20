@@ -21,7 +21,8 @@ export const registerUser = async (req, res) => {
       district,
       state,
       pincode,
-      subscription_name
+      subscription_name,
+      store_count  
     } = req.body;
 
     if (!name || !email || !phone || !password || !shop_name || !address || !district || !state || !pincode || !subscription_name) {
@@ -45,6 +46,7 @@ export const registerUser = async (req, res) => {
       email,
       phone,
       password: hashedPassword,
+       store_count: store_count || 1,
       gst_number: gst_number || null,
       shop_name,
       address,
