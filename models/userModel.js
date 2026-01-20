@@ -44,6 +44,22 @@ export const findUserByEmailOrPhone = async (email, phone) => {
   return rows.length ? rows[0] : null;
 };
 
+export const getAllUsers = async (page = 1, limit = 6) => {
+  const db = await connectDB();
+
+  // Execute the stored procedure
+  // Note: execute returns [rows, fields]. 
+  // Since we have multiple SELECT statements in SP (data + count), rows will be an array of result sets.
+  const [results] = await db.execute("CALL GetExistingCustomers(?, ?)", [page, limit]);
+
+  // results[0] is the user list
+  // results[1] is the total count
+  return {
+    users: results[0],
+    total: results[1][0].total_count
+  };
+};
+
 
 export const findUserByIdentifier = async (identifier) => {
   const db = await connectDB();

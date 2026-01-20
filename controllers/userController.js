@@ -5,8 +5,7 @@ import {
   findUserByEmailOrPhone,
   findSubscriptionByName,
   findUserByIdentifier,
-   getUsersPaginated, 
-   getUsersCount
+  getAllUsers
 } from "../models/userModel.js";
 
 export const registerUser = async (req, res) => {
@@ -114,30 +113,23 @@ export const loginUser = async (req, res) => {
   }
 };
 
-
-
-export const getAllUsers = async (req, res) => {
+export const getUsers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = 6;
-    const offset = (page - 1) * limit;
+    const limit = parseInt(req.query.limit) || 6;
 
-    const users = await getUsersPaginated(limit, offset);
-    const totalUsers = await getUsersCount();
+    const { users, total } = await getAllUsers(page, limit);
 
-    const totalPages = Math.ceil(totalUsers / limit);
-
-    res.json({
+    res.status(200).json({
       success: true,
+      data: users,
       pagination: {
-        totalUsers,
-        totalPages,
-        currentPage: page,
-        limit
-      },
-      users
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
     });
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
