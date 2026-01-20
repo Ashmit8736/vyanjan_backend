@@ -71,3 +71,24 @@ export const findUserByIdentifier = async (identifier) => {
 
   return rows.length ? rows[0] : null;
 };
+
+export const getUsersPaginated = async (limit, offset) => {
+  const db = await connectDB();
+
+  const [rows] = await db.execute(
+    "CALL GetUsersPaginated(?,?)",
+    [limit, offset]
+  );
+
+  return rows[0]; // SP result
+};
+
+export const getUsersCount = async () => {
+  const db = await connectDB();
+
+  const [rows] = await db.execute(
+    "CALL GetUsersCount()"
+  );
+
+  return rows[0][0].total;
+};
