@@ -28,7 +28,7 @@ const superAdminAuth = (req, res, next) => {
 
 export default superAdminAuth;
 
-export const userAuth = (req, res, next) => {
+export const userAuth1 = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
