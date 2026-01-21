@@ -5,7 +5,8 @@ import {
   findUserByEmailOrPhone,
   findSubscriptionByName,
   findUserByIdentifier,
-  getAllUsers
+  getAllUsers,
+  findUserById
 } from "../models/userModel.js";
 
 export const registerUser = async (req, res) => {
@@ -22,7 +23,7 @@ export const registerUser = async (req, res) => {
       state,
       pincode,
       subscription_name,
-      store_count  
+      store_count
     } = req.body;
 
     if (!name || !email || !phone || !password || !shop_name || !address || !district || !state || !pincode || !subscription_name) {
@@ -46,7 +47,7 @@ export const registerUser = async (req, res) => {
       email,
       phone,
       password: hashedPassword,
-       store_count: store_count || 1,
+      store_count: store_count || 1,
       gst_number: gst_number || null,
       shop_name,
       address,
@@ -76,6 +77,7 @@ export const loginUser = async (req, res) => {
     }
 
     const user = await findUserByIdentifier(email);
+
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
@@ -106,7 +108,9 @@ export const loginUser = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        phone: user.phone
+        phone: user.phone,
+        store_count: user.store_count,
+        created_branches_count: user.created_branches_count
       }
     });
 
@@ -137,3 +141,21 @@ export const getUsers = async (req, res) => {
   }
 };
 
+export const getUserBranchStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const stats = await findUserById(userId);
+
+    if (!stats) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      success: true,
+      store_count: stats.store_count,
+      created_branches_count: stats.created_branches_count
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

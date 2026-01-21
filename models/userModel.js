@@ -22,7 +22,7 @@ export const createUser = async (data) => {
       data.email,
       data.phone,
       data.password,
-       data.store_count,  
+      data.store_count,
       data.gst_number,
       data.shop_name,
       data.address,
@@ -66,11 +66,11 @@ export const findUserByIdentifier = async (identifier) => {
   const db = await connectDB();
 
   const [rows] = await db.execute(
-    "SELECT * FROM users WHERE email = ? OR phone = ? LIMIT 1",
-    [identifier, identifier]
+    "CALL get_branch_count(?)",
+    [identifier]
   );
 
-  return rows.length ? rows[0] : null;
+  return rows[0][0] || null;
 };
 
 export const getUsersPaginated = async (limit, offset) => {
@@ -94,5 +94,14 @@ export const getUsersCount = async () => {
   return rows[0][0].total;
 };
 
+export const findUserById = async (id) => {
+  const db = await connectDB();
 
+  // Fetch store_count and calculate created_branches_count in one go
+  const [rows] = await db.execute(
+    `SELECT store_count, (SELECT COUNT(*) FROM branch WHERE user_id = ?) as created_branches_count FROM users WHERE id = ?`,
+    [id, id]
+  );
 
+  return rows.length ? rows[0] : null;
+};
