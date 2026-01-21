@@ -27,3 +27,5 @@ const superAdminAuth = (req, res, next) => {
 };
 
 export default superAdminAuth;
+
+
