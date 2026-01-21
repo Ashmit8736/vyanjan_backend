@@ -6,7 +6,9 @@ import {
   findSubscriptionByName,
   findUserByIdentifier,
   getAllUsers,
-  findUserById
+  findUserById,
+  createBranchUser,
+  getUsersByBranch
 } from "../models/userModel.js";
 
 export const registerUser = async (req, res) => {
@@ -157,5 +159,78 @@ export const getUserBranchStats = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+
+
+
+
+// ✅ Create user under a branch
+export const addBranchUser = async (req, res) => {
+  try {
+    const ownerId = req.user.id;
+    // const ownerRole = req.user.role;
+
+    // 🔐 Only owner allowed
+    // if (ownerRole !== "owner") {
+    //   return res.status(403).json({
+    //     message: "Only owner can create branch users"
+    //   });
+    // }
+
+    const {
+      name,
+      email,
+      phone,
+      password,
+      branch_id,
+      role
+    } = req.body;
+
+    if (!["billing", "inventory", "both"].includes(role)) {
+      return res.status(400).json({
+        message: "Invalid role"
+      });
+    }
+
+    // 🔑 Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await createBranchUser([
+      name,
+      email,
+      phone,
+      hashedPassword,
+      branch_id,
+      ownerId,     // created_by
+      role,
+      1            // is_active
+    ]);
+
+    res.status(201).json({
+      message: "Branch user created successfully"
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ Get users of a branch
+export const getBranchUsers = async (req, res) => {
+  try {
+    const branchId = req.params.branchId;
+
+    const users = await getUsersByBranch(branchId);
+
+    res.status(200).json({
+      success: true,
+      total: users.length,
+      data: users
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

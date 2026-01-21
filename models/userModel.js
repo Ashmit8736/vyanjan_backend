@@ -105,3 +105,65 @@ export const findUserById = async (id) => {
 
   return rows.length ? rows[0] : null;
 };
+
+
+
+
+
+
+
+// export const createBranchUser = async (data) => {
+//   const db = await connectDB();
+
+//   const [result] = await db.query(
+//     `INSERT INTO users
+//     (name, email, phone, password, branch_id, created_by, role, is_active)
+//     VALUES (?,?,?,?,?,?,?,?)`,
+//     data
+//   );
+
+//   return result;
+// };
+
+
+// export const getUsersByBranch = async (branchId) => {
+//   const db = await connectDB();
+
+//   const [rows] = await db.query(
+//     `SELECT 
+//         u.id,
+//         u.name,
+//         u.email,
+//         u.phone,
+//         u.role,
+//         u.is_active,
+//         u.created_at,
+//         b.branch_name,
+//         b.gst_no
+//      FROM users u
+//      LEFT JOIN branch b ON b.branch_id = u.branch_id
+//      WHERE u.branch_id = ? AND u.is_active = 1`,
+//     [branchId]
+//   );
+
+//   return rows;
+// };
+
+export const createBranchUser = async (data) => {
+  const db = await connectDB();
+  await db.query(
+    "CALL CreateBranchUser(?,?,?,?,?,?,?,?)",
+    data
+  );
+};
+
+export const getUsersByBranch = async (branchId) => {
+  const db = await connectDB();
+  const [rows] = await db.query(
+    "CALL GetUsersByBranch(?)",
+    [branchId]
+  );
+
+  // mysql2 SP result structure
+  return rows[0];
+};
