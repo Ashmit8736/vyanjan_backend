@@ -10,10 +10,17 @@ const userAuth = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // 👇 SABSE IMPORTANT
+    // req.user = {
+    //   id: decoded.id,
+    //   role: decoded.role
+    // };
+
     req.user = {
-      id: decoded.id,
-      role: decoded.role
-    };
+  id: decoded.id,
+  role: decoded.role,
+  branch_id: decoded.branch_id || null
+};
+
 
     next();
   } catch (err) {

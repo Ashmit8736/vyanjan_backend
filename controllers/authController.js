@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { findSuperAdminByEmail } from "../models/superadminModel.js";
-import { findUserByIdentifier } from "../models/userModel.js";
+import { findUserByIdentifier, findUserForLogin } from "../models/userModel.js";
 
 export const unifiedLogin = async (req, res) => {
   try {
@@ -39,7 +39,8 @@ export const unifiedLogin = async (req, res) => {
     }
 
     // 🔹 2. Normal User check
-    const user = await findUserByIdentifier(email);
+    // const user = await findUserByIdentifier(email);
+    const user = await  findUserForLogin(email);
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
@@ -54,14 +55,15 @@ export const unifiedLogin = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, role: "USER" },
+      { id: user.id, role: user.role ,  branch_id: user.branch_id || null},
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
     return res.json({
       success: true,
-      role: "USER",
+      role: user.role,
+      // role: "USER",
       token,
       user: {
         id: user.id,
