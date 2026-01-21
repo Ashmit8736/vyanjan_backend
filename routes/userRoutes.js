@@ -1,29 +1,16 @@
-// import express from "express";
-// import { registerUser, getUsers, addBranch } from "../controllers/userController.js";
-// import superAdminAuth from "../middlewares/authMiddlewares.js";
-// import userAuth from "../middlewares/userMiddleware.js";
-
-// const router = express.Router();
-
-// router.post("/signup", superAdminAuth, registerUser);
-// router.get("/list", superAdminAuth, getUsers);
-// router.post("/add", userAuth, addBranch);
-
-
-// export default router;
 import express from "express";
-import { registerUser, getUsers } from "../controllers/userController.js";
-import { addBranch,getMyBranches } from "../controllers/branchController.js";
-import superAdminAuth from "../middlewares/authMiddlewares.js";
+import { registerUser, getUsers, getUserBranchStats } from "../controllers/userController.js";
+import superAdminAuth, { userAuth } from "../middlewares/authMiddlewares.js";
+import {addBranch, getMyBranches } from "../controllers/branchController.js";
 import userAuth from "../middlewares/userMiddleware.js";
 
 const router = express.Router();
 
 router.post("/signup", superAdminAuth, registerUser);
 router.get("/list", superAdminAuth, getUsers);
-// router.post("/branch/add", userAuth, addBranch);
+router.get("/branch-stats", userAuth, getUserBranchStats);
 
-router.post("/create", userAuth, addBranch);
-router.get("/branches", userAuth, getMyBranches);
+router.post("/create", userAuth , addBranch );
+router.get("/branches", userAuth , getMyBranches);
 
 export default router;
