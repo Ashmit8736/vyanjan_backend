@@ -4,6 +4,8 @@ import testRoute from "./routes/testRoute.js";
 import superAdminRoutes from "./routes/superAdminRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import unitRoutes from "./routes/unitRoutes.js";
+import rawMaterialRoutes from "./routes/rawMaterialRoutes.js";
 
 const app = express();
 
@@ -17,5 +19,7 @@ app.use("/", testRoute);
 app.use("/api", superAdminRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/units", unitRoutes);
+app.use("/api/raw", rawMaterialRoutes);
 
 export default app;
