@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.post("/signup", superAdminAuth, registerUser);
 router.get("/list", superAdminAuth, getUsers);
-router.get("/branch-stats", userAuth1, getUserBranchStats);
+router.get("/branch-stats", userAuth, getUserBranchStats);
 
 router.post("/create", userAuth , addBranch );
 router.get("/branches", userAuth , getMyBranches);
