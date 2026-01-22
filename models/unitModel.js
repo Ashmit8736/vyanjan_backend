@@ -64,7 +64,7 @@ const UnitModel = {
     const db = await connectDB();
 
     const sql = `
-      SELECT id, unit_name, unit_symbol
+      SELECT id, unit_name, unit_symbol, created_at
       FROM units
       WHERE is_active = 1
       ORDER BY unit_name ASC
