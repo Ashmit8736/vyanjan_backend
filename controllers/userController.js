@@ -8,7 +8,8 @@ import {
   getAllUsers,
   findUserById,
   createBranchUser,
-  getUsersByBranch
+  getUsersByBranch,
+  getUsersCreatedByOwner
 } from "../models/userModel.js";
 
 export const registerUser = async (req, res) => {
@@ -233,5 +234,28 @@ export const getBranchUsers = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+export const getOwnerUsers = async (req, res) => {
+  try {
+    const ownerId = req.user.id; // auth middleware se
+
+    const users = await getUsersCreatedByOwner(ownerId);
+
+    return res.status(200).json({
+      success: true,
+      count: users.length,
+      data: users
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+      error: error.message
+    });
   }
 };

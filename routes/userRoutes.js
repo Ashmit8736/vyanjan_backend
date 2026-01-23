@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, getUsers, getUserBranchStats, addBranchUser, getBranchUsers } from "../controllers/userController.js";
+import { registerUser, getUsers, getUserBranchStats, addBranchUser, getBranchUsers , getOwnerUsers} from "../controllers/userController.js";
 import superAdminAuth, { userAuth1 } from "../middlewares/authMiddlewares.js";
 import {addBranch, getMyBranches } from "../controllers/branchController.js";
 import userAuth from "../middlewares/userMiddleware.js";
@@ -18,4 +18,6 @@ router.post("/branchUser", userAuth, addBranchUser);
 
 router.get("/branch/:branchId", userAuth, getBranchUsers);
 
+
+router.get("/owner/users", userAuth, getOwnerUsers);
 export default router;
