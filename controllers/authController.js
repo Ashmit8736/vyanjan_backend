@@ -70,7 +70,8 @@ export const unifiedLogin = async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
-        shop_name: user.shop_name
+        shop_name: user.shop_name,
+        branch_id: user.branch_id,
       }
     });
 
