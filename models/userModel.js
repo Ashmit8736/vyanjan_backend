@@ -157,3 +157,29 @@ export const findUserForLogin = async (email) => {
 
   return rows.length ? rows[0] : null;
 };
+
+
+
+export const getUsersCreatedByOwner = async (ownerId) => {
+  const db = await connectDB();   // 🔥 THIS WAS MISSING
+
+  const query = `
+    SELECT 
+      u.id,
+      u.name,
+      u.email,
+      u.phone,
+      u.role,
+      u.is_active,
+      b.branch_name
+    FROM users u
+    JOIN branch b ON b.branch_id = u.branch_id
+    WHERE 
+      u.created_by = ?
+      AND u.role IN ('inventory', 'billing', 'both')
+    ORDER BY u.created_at DESC
+  `;
+
+  const [rows] = await db.query(query, [ownerId]);
+  return rows;
+};
