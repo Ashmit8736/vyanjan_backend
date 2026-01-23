@@ -111,6 +111,7 @@ export const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+         branch_id: user.branch_id ,
         store_count: user.store_count,
         created_branches_count: user.created_branches_count
       }
