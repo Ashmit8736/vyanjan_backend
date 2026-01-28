@@ -2,7 +2,28 @@ import connectDB from "../config/db.js";
 
 const RawMaterialStockModel = {
 
-  // ✅ UPSERT Opening / Current Stock
+  // upsertStock: async ({
+  //   raw_material_id,
+  //   branch_id,
+  //   quantity_in_consume_unit
+  // }) => {
+  //   const db = await connectDB();
+
+  //   const sql = `
+  //     INSERT INTO raw_material_stock
+  //       (raw_material_id, branch_id, quantity)
+  //     VALUES (?, ?, ?)
+  //     ON DUPLICATE KEY UPDATE
+  //       quantity = VALUES(quantity)
+  //   `;
+
+  //   await db.execute(sql, [
+  //     raw_material_id,
+  //     branch_id,
+  //     quantity_in_consume_unit
+  //   ]);
+  // },
+
   upsertStock: async ({
     raw_material_id,
     branch_id,
@@ -15,7 +36,7 @@ const RawMaterialStockModel = {
         (raw_material_id, branch_id, quantity)
       VALUES (?, ?, ?)
       ON DUPLICATE KEY UPDATE
-        quantity = VALUES(quantity)
+        quantity = quantity + VALUES(quantity)
     `;
 
     await db.execute(sql, [
@@ -25,31 +46,10 @@ const RawMaterialStockModel = {
     ]);
   },
 
-  // ✅ GET Available Stock with category & consume unit
+
+
   getAvailableStockByBranch: async (branch_id) => {
     const db = await connectDB();
-
-    // const sql = `
-    //   SELECT
-    //     rm.id AS raw_material_id,
-    //     rm.name AS raw_material_name,
-    //     rm.category,
-
-    //     rms.quantity AS available_quantity,
-
-    //     u.unit_name AS consume_unit,
-    //     u.unit_symbol AS consume_unit_symbol
-
-    //   FROM raw_material_stock rms
-    //   JOIN raw_materials rm ON rm.id = rms.raw_material_id
-    //   JOIN units u ON u.id = rm.consume_unit_id
-
-    //   WHERE rms.branch_id = ?
-    //     AND rm.is_active = 1
-
-    //   ORDER BY rm.category, rm.name
-    // `;
-
     
     const sql = `
      SELECT
@@ -83,7 +83,6 @@ ORDER BY rm.category, rm.name;
     return rows;
   },
 
-  // 🔹 helper: raw material info (conversion ke liye)
   getRawMaterialForStock: async (raw_material_id) => {
     const db = await connectDB();
 
