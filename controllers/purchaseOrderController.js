@@ -1,122 +1,3 @@
-// import { createPurchaseOrder } from "../models/purchaseOrderModel.js";
-
-// export const createPurchaseOrderController = async (req, res) => {
-//   try {
-//     const branch_id = req.user.branch_id;
-//     const { supplier_id, purchase_date, invoice_number, discount_amount = 0, items } = req.body;
-
-//     if (!supplier_id || !purchase_date || !items || items.length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Supplier, purchase date and items are required"
-//       });
-//     }
-
-//     // 🔢 Calculations
-//     let subTotal = 0;
-//     const calculatedItems = items.map(item => {
-//       const total = item.quantity * item.unit_price;
-//       subTotal += total;
-//       return { ...item, total_amount: total };
-//     });
-
-//     const taxAmount = subTotal * 0.05; // 5% GST (example)
-//     const grandTotal = subTotal + taxAmount - discount_amount;
-
-//     // 🧾 PO number generate
-//     const poNumber = `PO-${Date.now()}`;
-
-//     const data = [
-//       branch_id,
-//       supplier_id,
-//       poNumber,
-//       invoice_number || null,
-//       purchase_date,
-//       subTotal,
-//       taxAmount,
-//       discount_amount,
-//       grandTotal
-//     ];
-
-//     const purchaseOrderId = await createPurchaseOrder(data, calculatedItems);
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Purchase order created & stock updated",
-//       purchase_order_id: purchaseOrderId
-//     });
-
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-
-// import { createPurchaseOrder } from "../models/purchaseOrderModel.js";
-
-// export const createPurchaseOrderController = async (req, res) => {
-//   try {
-//     const branch_id = req.user.branch_id;
-//     const {
-//       supplier_id,
-//       purchase_date,
-//       invoice_number,
-//       discount_amount = 0,
-//       items
-//     } = req.body;
-
-//     if (!supplier_id || !purchase_date || !items || items.length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Supplier, purchase date and items are required"
-//       });
-//     }
-
-//     // 🔢 Calculations
-//     let subTotal = 0;
-//     const calculatedItems = items.map(item => {
-//       const total = item.quantity * item.unit_price;
-//       subTotal += total;
-//       return { ...item, total_amount: total };
-//     });
-
-//     const taxAmount = subTotal * 0.05; // 5% GST example
-//     const grandTotal = subTotal + taxAmount - discount_amount;
-
-//     const poNumber = `PO-${Date.now()}`;
-
-//     const data = [
-//       branch_id,
-//       supplier_id,
-//       poNumber,
-//       invoice_number || null,
-//       purchase_date,
-//       subTotal,
-//       taxAmount,
-//       discount_amount,
-//       grandTotal
-//     ];
-
-//     const purchaseOrderId = await createPurchaseOrder(data, calculatedItems);
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Purchase order created & stock updated",
-//       purchase_order_id: purchaseOrderId
-//     });
-
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-
 import connectDB from "../config/db.js";
 import { createPurchaseOrder, getPurchaseOrdersByBranch  } from "../models/purchaseOrderModel.js";
 
@@ -130,6 +11,7 @@ export const createPurchaseOrderController = async (req, res) => {
       invoice_number,
       tax_amount = 0,
       discount_amount = 0,
+      payment_status = 'pending',
       items
     } = req.body;
 
@@ -185,7 +67,8 @@ export const createPurchaseOrderController = async (req, res) => {
       subTotal,
       taxAmount,
       discount_amount,
-      grandTotal
+      grandTotal, 
+      payment_status
     ];
 
     const purchaseOrderId = await createPurchaseOrder(data, calculatedItems);

@@ -9,6 +9,7 @@ import rawMaterialRoutes from "./routes/rawMaterialRoutes.js";
 import StockRoutes from "./routes/StockRoutes.js";
 import supplierRoutes from "./routes/supplierRoutes.js";
 import purchaseOrderRoutes from "./routes/purchaseOrderRoutes.js";
+import stockPurchaseItemRoutes from "./routes/stockPurchaseItemRoutes.js";
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/raw", rawMaterialRoutes);
 app.use("/api/stock", StockRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/purchaseOrders", purchaseOrderRoutes);
+app.use("/api/stockPurchaseItems", stockPurchaseItemRoutes);
 
 
 export default app;
