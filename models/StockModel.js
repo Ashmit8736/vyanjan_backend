@@ -2,28 +2,6 @@ import connectDB from "../config/db.js";
 
 const RawMaterialStockModel = {
 
-  // upsertStock: async ({
-  //   raw_material_id,
-  //   branch_id,
-  //   quantity_in_consume_unit
-  // }) => {
-  //   const db = await connectDB();
-
-  //   const sql = `
-  //     INSERT INTO raw_material_stock
-  //       (raw_material_id, branch_id, quantity)
-  //     VALUES (?, ?, ?)
-  //     ON DUPLICATE KEY UPDATE
-  //       quantity = VALUES(quantity)
-  //   `;
-
-  //   await db.execute(sql, [
-  //     raw_material_id,
-  //     branch_id,
-  //     quantity_in_consume_unit
-  //   ]);
-  // },
-
   upsertStock: async ({
     raw_material_id,
     branch_id,
