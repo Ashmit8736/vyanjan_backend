@@ -86,6 +86,49 @@ for (const item of items) {
   );
 
   // history same rahegi
+
+   const amount = item.quantity * item.unit_price;
+      const itemDiscount = item.item_discount || 0;
+      const finalAmount = amount - itemDiscount;
+
+      // 🔹 Insert purchase history (store ORIGINAL purchase data)
+      await conn.query(
+        `INSERT INTO stock_purchase_items
+         (
+           purchase_order_id,
+           raw_material_id,
+           branch_id,
+           quantity,
+           unit_id,
+           unit_price,
+           amount,
+           cgst_percent,
+           sgst_percent,
+           igst_percent,
+           cgst_amount,
+           sgst_amount,
+           igst_amount,
+           item_discount,
+           final_amount
+         )
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          purchase_order_id,
+          item.raw_material_id,
+          branch_id,
+          item.quantity,           // purchase qty
+          item.unit_id,            // purchase unit
+          item.unit_price,
+          amount,
+          item.cgst_percent || 0,
+          item.sgst_percent || 0,
+          item.igst_percent || 0,
+          0, 0, 0,                  // tax calc later if needed
+          itemDiscount,
+          finalAmount
+        ]
+      );
+
 }
 
 
