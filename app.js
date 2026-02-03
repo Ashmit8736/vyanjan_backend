@@ -10,6 +10,8 @@ import StockRoutes from "./routes/StockRoutes.js";
 import supplierRoutes from "./routes/supplierRoutes.js";
 import purchaseOrderRoutes from "./routes/purchaseOrderRoutes.js";
 import stockPurchaseItemRoutes from "./routes/stockPurchaseItemRoutes.js";
+import itemRoutes from "./routes/itemRoutes.js";
+import recipeRoutes from "./routes/recipeRoutes.js";
 
 const app = express();
 
@@ -29,6 +31,9 @@ app.use("/api/stock", StockRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/purchaseOrders", purchaseOrderRoutes);
 app.use("/api/stockPurchaseItems", stockPurchaseItemRoutes);
+
+app.use("/api/item", itemRoutes);
+app.use("/api/recipe", recipeRoutes);
 
 
 export default app;
