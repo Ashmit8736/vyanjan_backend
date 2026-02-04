@@ -15,9 +15,7 @@ export const createItem = async (branch_id, name, category, selling_price) => {
   return result.insertId;
 };
 
-/**
- * Get items by branch
- */
+
 export const getItemsByBranch = async (branch_id) => {
   const conn = await connectDB();
 
