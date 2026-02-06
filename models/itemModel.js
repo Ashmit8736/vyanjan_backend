@@ -20,10 +20,29 @@ export const getItemsByBranch = async (branch_id) => {
   const conn = await connectDB();
 
   const [rows] = await conn.execute(
-    `SELECT *
-     FROM items
-     WHERE branch_id = ? AND is_active = 1
-     ORDER BY id DESC`,
+    `SELECT 
+        i.id,
+        i.name,
+        i.category,
+        i.selling_price,
+
+        r.item_quantity,
+        u.unit_name   AS item_unit_name,
+        u.unit_symbol AS item_unit_symbol
+
+     FROM items i
+
+     LEFT JOIN recipes r 
+       ON r.item_id = i.id
+       AND r.is_active = 1
+
+     LEFT JOIN units u
+       ON u.id = r.item_unit_id
+
+     WHERE i.branch_id = ?
+       AND i.is_active = 1
+
+     ORDER BY i.id DESC`,
     [branch_id]
   );
 

@@ -1,7 +1,8 @@
 import connectDB from "../config/db.js";
 import {
   createPurchaseOrder,
-  getPurchaseOrdersByBranch
+  getPurchaseOrdersByBranch,
+  getPurchaseOrderById
 } from "../models/purchaseOrderModel.js";
 
 export const createPurchaseOrderController = async (req, res) => {
@@ -108,6 +109,35 @@ export const getPurchaseOrdersController = async (req, res) => {
     const branchId = req.user.branch_id;
 
     const data = await getPurchaseOrdersByBranch(branchId);
+
+    res.json({
+      success: true,
+      data
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+
+export const getPurchaseOrderReportController = async (req, res) => {
+  try {
+    const branchId = req.user.branch_id;
+    const { id } = req.params;
+
+    const data = await getPurchaseOrderById(id, branchId);
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "Purchase order not found"
+      });
+    }
 
     res.json({
       success: true,
