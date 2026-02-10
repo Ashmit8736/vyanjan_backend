@@ -2,7 +2,10 @@ import connectDB from "../config/db.js";
 import {
   createStockPurchaseItems,
   updateRawMaterialStockPurchase,
-  getStockByBranch
+  getStockByBranch,
+  // getStockReportByPOId,
+   getStockPurchaseList,
+   getStockReportByPONumber
 } from "../models/stockPurchaseItemModel.js";
 
 export const createStockPurchaseItemsController = async (req, res) => {
@@ -128,3 +131,58 @@ export const getStockController = async (req, res) => {
   res.json({ success: true, data });
 };
 
+
+
+
+/* ===== GET STOCK PURCHASE LIST ===== */
+export const stockPurchaseList = async (req, res) => {
+  try {
+    const { branchId } = req.params;
+
+    if (!branchId) {
+      return res.status(400).json({
+        success: false,
+        message: "Branch ID is required"
+      });
+    }
+
+    const data = await getStockPurchaseList(branchId);
+
+    res.json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    console.error("❌ Stock Purchase List Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+
+export const getStockReport = async (req, res) => {
+  try {
+    const { poNumber } = req.params;
+    const branchId = req.user.branch_id;
+
+
+    const data = await getStockReportByPONumber(poNumber, branchId);
+
+    if (!data.header) {
+      return res.status(404).json({
+        message: "No stock purchase entries found for this PO",
+      });
+    }
+
+    res.json({
+      success: true,
+      header: data.header,
+      items: data.items,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

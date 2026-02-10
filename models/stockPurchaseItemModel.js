@@ -134,3 +134,94 @@ export const getStockByBranch = async (branchId) => {
 
   return rows;
 };
+
+
+
+/* ===== GET STOCK LIST (SUMMARY) ===== */
+export const getStockPurchaseList = async (branchId) => {
+  const conn = await connectDB();
+
+  const [rows] = await conn.query(
+    `
+    SELECT
+      po.id,
+      po.po_number,
+      po.purchase_date AS invoice_date,
+      s.name AS supplier_name,
+
+      -- 🔥 GRAND TOTAL
+      SUM(
+        (spi.quantity * spi.unit_price)
+        + ((spi.cgst_percent + spi.sgst_percent + spi.igst_percent) / 100)
+          * (spi.quantity * spi.unit_price)
+        - spi.item_discount
+      ) AS grand_total
+
+    FROM purchase_orders po
+    JOIN suppliers s
+      ON s.id = po.supplier_id
+    JOIN stock_purchase_items spi
+      ON spi.purchase_order_id = po.id
+
+    WHERE spi.branch_id = ?
+    GROUP BY po.id
+    ORDER BY po.id DESC
+    `,
+    [branchId]
+  );
+
+  return rows;
+};
+
+
+export const getStockReportByPONumber = async (poNumber, branchId) => {
+  const conn = await connectDB();
+
+  const [[header]] = await conn.query(
+    `
+    SELECT
+      po.id AS purchase_order_id,
+      po.po_number,
+      po.invoice_number,
+      po.purchase_date AS invoice_date,
+      s.name AS supplier_name
+    FROM stock_purchase_items spi
+    JOIN purchase_orders po ON po.id = spi.purchase_order_id
+    JOIN suppliers s ON s.id = po.supplier_id
+    WHERE spi.branch_id = ?
+      AND po.po_number = ?
+    LIMIT 1
+    `,
+    [branchId, poNumber]
+  );
+
+  if (!header) {
+    console.log("❌ HEADER NOT FOUND IN MODEL");
+    return { header: null, items: [] };
+  }
+
+  const [items] = await conn.query(
+    `
+    SELECT
+      rm.name AS rawMaterial,
+      spi.quantity AS qty,
+      u.unit_symbol AS unit,
+      spi.unit_price AS price,
+      spi.cgst_percent AS cgst,
+      spi.sgst_percent AS sgst,
+      spi.igst_percent AS igst,
+      spi.item_discount AS discount,
+      spi.final_amount AS total
+    FROM stock_purchase_items spi
+    JOIN raw_materials rm ON rm.id = spi.raw_material_id
+    JOIN units u ON u.id = spi.unit_id
+    WHERE spi.branch_id = ?
+      AND spi.purchase_order_id = ?
+    ORDER BY spi.id ASC
+    `,
+    [branchId, header.purchase_order_id]
+  );
+
+
+  return { header, items };
+};

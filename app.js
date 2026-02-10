@@ -12,6 +12,7 @@ import purchaseOrderRoutes from "./routes/purchaseOrderRoutes.js";
 import stockPurchaseItemRoutes from "./routes/stockPurchaseItemRoutes.js";
 import itemRoutes from "./routes/itemRoutes.js";
 import recipeRoutes from "./routes/recipeRoutes.js";
+import productionRoutes from "./routes/producationRoute.js"
 
 const app = express();
 
@@ -34,6 +35,8 @@ app.use("/api/stockPurchaseItems", stockPurchaseItemRoutes);
 
 app.use("/api/item", itemRoutes);
 app.use("/api/recipe", recipeRoutes);
+
+app.use("/api/production", productionRoutes);
 
 
 export default app;
