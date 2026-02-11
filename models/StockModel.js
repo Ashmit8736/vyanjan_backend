@@ -81,3 +81,47 @@ ORDER BY rm.category, rm.name;
 };
 
 export default RawMaterialStockModel;
+
+
+export const getCurrentStock = async ({ category, rawMaterial }) => {
+  const db = await connectDB();   // ✅ ADD THIS LINE
+
+  let conditions = [];
+  let params = [];
+
+  if (category && category !== "All") {
+    conditions.push("rm.category = ?");
+    params.push(category);
+  }
+
+  if (rawMaterial) {
+    conditions.push("rm.name LIKE ?");
+    params.push(`%${rawMaterial}%`);
+  }
+
+  const whereClause =
+    conditions.length > 0
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
+
+  const sql = `
+    SELECT
+      rm.category AS category,
+      rm.name AS rawMaterial,
+      rms.quantity AS quantity,
+      cu.unit_symbol AS unit,
+      IFNULL(AVG(spi.unit_price), 0) AS price,
+      (rms.quantity * IFNULL(AVG(spi.unit_price), 0)) AS total
+    FROM raw_material_stock rms
+    JOIN raw_materials rm ON rm.id = rms.raw_material_id
+    JOIN units cu ON cu.id = rm.consume_unit_id
+    LEFT JOIN stock_purchase_items spi
+      ON spi.raw_material_id = rm.id
+    ${whereClause}
+    GROUP BY rm.id, rms.quantity, cu.unit_symbol
+    ORDER BY rm.name ASC
+  `;
+
+  const [rows] = await db.execute(sql, params);
+  return rows;
+};

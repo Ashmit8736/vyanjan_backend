@@ -1,5 +1,7 @@
 import RawMaterialStockModel from "../models/StockModel.js";
 
+import { getCurrentStock } from "../models/StockModel.js";
+
 export const setOpeningStock = async (req, res) => {
   try {
     const branch_id = req.user.branch_id;
@@ -83,6 +85,30 @@ export const getAvailableStock = async (req, res) => {
       success: false,
       message: "Stock fetch failed",
       error: error.message
+    });
+  }
+};
+
+
+
+export const fetchCurrentStock = async (req, res) => {
+  try {
+    const { category, rawMaterial } = req.query;
+
+    const data = await getCurrentStock({
+      category,
+      rawMaterial,
+    });
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("❌ Current stock error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch current stock",
     });
   }
 };
