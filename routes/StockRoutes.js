@@ -1,7 +1,8 @@
 import express from "express";
 import {
   setOpeningStock,
-  getAvailableStock
+  getAvailableStock,
+  fetchCurrentStock
 } from "../controllers/StockController.js";
 import userAuth from "../middlewares/userMiddleware.js";
 
@@ -17,6 +18,12 @@ router.get(
   "/stockAvailable",
   userAuth,
   getAvailableStock
+);
+
+router.get(
+  "/report-currentStock",
+  userAuth,
+  fetchCurrentStock
 );
 
 export default router;
