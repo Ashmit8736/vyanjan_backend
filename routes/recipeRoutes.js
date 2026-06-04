@@ -2,6 +2,7 @@ import express from "express";
 import {
   createRecipeController,
   getRecipeByItemController,
+  updateRecipeController,
 } from "../controllers/recipeController.js";
 
 import  userAuth  from "../middlewares/userMiddleware.js";
@@ -13,6 +14,13 @@ router.post(
   "/create",
   userAuth,
   createRecipeController
+);
+
+// update recipe
+router.post(
+  "/update",
+  userAuth,
+  updateRecipeController
 );
 
 // get recipe by item

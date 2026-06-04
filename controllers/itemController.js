@@ -1,11 +1,11 @@
-import { createItem, getItemsByBranch } from "../models/itemModel.js";
+import { createItem, getItemsByBranch, updateItem, deleteItem, getItemLogs } from "../models/itemModel.js";
 
 /**
- * Create item
- */
+  * Create item
+  */
 export const createItemController = async (req, res) => {
   try {
-    const { name, category, selling_price } = req.body;
+    const { name, category, selling_price, item_unit_id } = req.body;
     const branch_id = req.user.branch_id;
 
     if (!name) {
@@ -19,7 +19,8 @@ export const createItemController = async (req, res) => {
       branch_id,
       name,
       category || null,
-      selling_price || 0
+      selling_price || 0,
+      item_unit_id || null
     );
 
     res.status(201).json({
@@ -37,8 +38,8 @@ export const createItemController = async (req, res) => {
 };
 
 /**
- * Get items (branch-wise)
- */
+  * Get items (branch-wise)
+  */
 export const getItemsController = async (req, res) => {
   try {
     const branch_id = req.user.branch_id;
@@ -54,6 +55,74 @@ export const getItemsController = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching items",
+    });
+  }
+};
+
+export const updateItemController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, category, selling_price, item_unit_id } = req.body;
+    const branch_id = req.user.branch_id;
+
+    if (!id || !name) {
+      return res.status(400).json({
+        success: false,
+        message: "Item ID and name are required",
+      });
+    }
+
+    await updateItem(id, branch_id, name, category, Number(selling_price || 0), item_unit_id ? Number(item_unit_id) : null);
+
+    res.status(200).json({
+      success: true,
+      message: "Item updated successfully",
+    });
+  } catch (error) {
+    console.error("Update Item Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating item",
+    });
+  }
+};
+
+export const deleteItemController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const branch_id = req.user.branch_id;
+
+    await deleteItem(id, branch_id);
+
+    res.status(200).json({
+      success: true,
+      message: "Item deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete Item Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting item",
+    });
+  }
+};
+
+export const getItemLogsController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const branch_id = req.user.branch_id;
+
+    const data = await getItemLogs(id, branch_id);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Get Item Logs Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching item logs",
     });
   }
 };

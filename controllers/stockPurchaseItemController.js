@@ -9,13 +9,30 @@ import {
 } from "../models/stockPurchaseItemModel.js";
 
 export const createStockPurchaseItemsController = async (req, res) => {
-  const conn = await connectDB();
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
 
   try {
     await conn.beginTransaction();
 
     const branch_id = req.user.branch_id;
-    const { purchase_order_id, items } = req.body;
+    const { purchase_order_id, invoice_number, invoice_date, payment_status, items } = req.body;
+
+    // Update the purchase order status to completed and persist invoice details and payment status
+    await conn.execute(
+      `UPDATE purchase_orders
+       SET status = 'completed',
+           payment_status = ?,
+           invoice_number = ?,
+           purchase_date = ?
+       WHERE id = ?`,
+      [
+        payment_status || 'pending',
+        invoice_number || null,
+        invoice_date || null,
+        purchase_order_id
+      ]
+    );
 
 
 for (const item of items) {
@@ -119,6 +136,8 @@ const finalAmount = amount + totalTax - itemDiscount;
   } catch (err) {
     await conn.rollback();
     res.status(500).json({ success: false, message: err.message });
+  } finally {
+    conn.release();
   }
 };
 
