@@ -48,6 +48,7 @@ export const getRecipeByItem = async (item_id) => {
   const [rows] = await conn.execute(
     `SELECT 
         r.id AS recipe_id,
+        r.created_at AS recipe_created_at,
 
         r.item_quantity,
         iu.unit_name   AS item_unit_name,

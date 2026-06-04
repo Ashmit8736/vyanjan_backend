@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Petpooja Inventory Integration Report</title>
+  <!-- Google Fonts for premium typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --secondary: #64748b;
+      --text: #1e293b;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+      color: var(--text);
+      background-color: var(--bg);
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 30px;
+      margin-bottom: 15px;
+      border-left: 4px solid var(--primary);
+      padding-left: 12px;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #334155;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 15px;
+      color: #475569;
+    }
+
+    /* Tabs Navigation */
+    .tabs-nav {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--secondary);
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      color: white;
+      background-color: var(--primary);
+      box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+    }
+
+    .tab-btn:hover:not(.active) {
+      background-color: #cbd5e1;
+      color: #0f172a;
+    }
+
+    /* Print Button */
+    .print-btn-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 20px;
+    }
+
+    .print-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background-color: var(--success);
+      color: white;
+      padding: 10px 20px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);
+      transition: background-color 0.2s;
+    }
+
+    .print-btn:hover {
+      background-color: #059669;
+    }
+
+    /* Content Cards */
+    .report-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      margin-bottom: 40px;
+    }
+
+    .report-content {
+      display: none;
+    }
+
+    .report-content.active {
+      display: block;
+    }
+
+    /* Dual Mode Grid */
+    .dual-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+    }
+
+    .dual-col {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Tables styling */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      margin-bottom: 25px;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 12px 15px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    code {
+      font-family: Consolas, Monaco, monospace;
+      background-color: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #0f172a;
+      font-size: 0.85em;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .badge-get { background-color: #dbeafe; color: #1e40af; }
+    .badge-post { background-color: #dcfce7; color: #166534; }
+    .badge-put { background-color: #fef9c3; color: #854d0e; }
+    .badge-delete { background-color: #fee2e2; color: #991b1b; }
+
+    /* Print styling rules */
+    @media print {
+      body {
+        background: white;
+        color: black;
+        padding: 0;
+      }
+      .tabs-nav, .print-btn-container {
+        display: none !important;
+      }
+      .report-card {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        margin-bottom: 0;
+      }
+      .report-content {
+        display: block !important;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+      /* In print mode, hide dual column and show sequentially instead to fit paper */
+      .dual-grid {
+        display: block;
+      }
+      .dual-col {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        margin-bottom: 40px;
+      }
+      th {
+        background-color: #e2e8f0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Petpooja Inventory Integration Report</h1>
+      <p style="font-size: 1.1rem; color: var(--secondary);">Comprehensive System Documentation • संपूर्ण सिस्टम प्रलेखन</p>
+    </header>
+
+    <!-- Navigation Control Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('english')">English Version</button>
+      <button class="tab-btn" onclick="switchTab('hindi')">हिंदी संस्करण (Hindi)</button>
+      <button class="tab-btn" onclick="switchTab('dual')">Dual View (Side-by-Side)</button>
+    </div>
+
+    <!-- Print Button -->
+    <div class="print-btn-container">
+      <button class="print-btn" onclick="window.print()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v8H6z"></path></svg>
+        Save as PDF / Print
+      </button>
+    </div>
+
+    <!-- REPORT CARD CONTAINER -->
+    <div class="report-card">
+      
+      <!-- ================= ENGLISH SECTION ================= -->
+      <div id="english-content" class="report-content active">
+        <h1 style="text-align: center; margin-bottom: 30px; color: #1e3a8a;">Petpooja Inventory Integration Report</h1>
+        
+        <h2>1. Project Overview</h2>
+        <p>This web application is a comprehensive restaurant inventory, recipe mapping, production execution, and billing management system. It integrates the frontend interface built in <strong>React + Electron</strong> (for desktop execution) and the backend REST API powered by <strong>Node.js (Express) and MariaDB</strong>.</p>
+        <p>The primary core data flow operates as follows:</p>
+        <p style="font-weight: 600; text-align: center; background-color: #f1f5f9; padding: 12px; border-radius: 8px; color: #1e40af;">
+          Item Master → Vendor Master → Purchase Order (PO) → GRN/Stock Purchase → Stock In → Recipe Mapping → POS Billing with Auto-Consumption → Stock Adjustment / Wastage → Reports & Dashboard
+        </p>
+
+        <h2>2. Database Schema & Mapped Data</h2>
+        <p>To support transactions, tracking, and logs, the database schema was modified or introduced with new tables:</p>
+
+        <h3>A. <code>sales_invoices</code> (POS Billing Transactions)</h3>
+        <p>Records high-level details of billing events.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Column Name</th>
+              <th>Data Type</th>
+              <th>Key / Reference</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>Primary Key (AI)</td>
+              <td>Unique Invoice ID</td>
+            </tr>
+            <tr>
+              <td><code>branch_id</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>Identifies the branch conducting the transaction</td>
+            </tr>
+            <tr>
+              <td><code>invoice_number</code></td>
+              <td>VARCHAR</td>
+              <td>Unique</td>
+              <td>Unique business invoice reference number</td>
+            </tr>
+            <tr>
+              <td><code>total_amount</code></td>
+              <td>DECIMAL(10,2)</td>
+              <td>-</td>
+              <td>Total billing amount before/after discounts</td>
+            </tr>
+            <tr>
+              <td><code>payment_status</code></td>
+              <td>VARCHAR</td>
+              <td>-</td>
+              <td>Payment status: <code>'paid'</code>, <code>'unpaid'</code>, <code>'pending'</code></td>
+            </tr>
+            <tr>
+              <td><code>created_at</code></td>
+              <td>TIMESTAMP</td>
+              <td>-</td>
+              <td>Invoice generation timestamp</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>B. <code>sales_invoice_items</code> (POS Invoice Items Sold)</h3>
+        <p>Tracks quantity and pricing of specific items in each billing transaction.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Column Name</th>
+              <th>Data Type</th>
+              <th>Reference</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>Primary Key (AI)</td>
+              <td>Item Sold ID</td>
+            </tr>
+            <tr>
+              <td><code>invoice_id</code></td>
+              <td>INT</td>
+              <td>Foreign Key -> <code>sales_invoices.id</code></td>
+              <td>Associated parent invoice</td>
+            </tr>
+            <tr>
+              <td><code>item_id</code></td>
+              <td>INT</td>
+              <td>Foreign Key -> <code>items.id</code></td>
+              <td>The sold finished menu item</td>
+            </tr>
+            <tr>
+              <td><code>quantity</code></td>
+              <td>DECIMAL(10,2)</td>
+              <td>-</td>
+              <td>Quantity sold</td>
+            </tr>
+            <tr>
+              <td><code>price</code></td>
+              <td>DECIMAL(10,2)</td>
+              <td>-</td>
+              <td>Unit selling price</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>C. <code>wastage_records</code> (Raw Material Wastage)</h3>
+        <p>Logs raw material wastage events, calculating immediate financial loss and deducting quantities from stock.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Column Name</th>
+              <th>Data Type</th>
+              <th>Reference</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>Primary Key (AI)</td>
+              <td>Wastage Log ID</td>
+            </tr>
+            <tr>
+              <td><code>branch_id</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>Identifies the branch of wastage</td>
+            </tr>
+            <tr>
+              <td><code>raw_material_id</code></td>
+              <td>INT</td>
+              <td>Foreign Key -> <code>raw_materials.id</code></td>
+              <td>Wasted ingredient reference</td>
+            </tr>
+            <tr>
+              <td><code>quantity</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>Wasted quantity entered in purchase unit</td>
+            </tr>
+            <tr>
+              <td><code>loss_amount</code></td>
+              <td>DECIMAL(10,2)</td>
+              <td>-</td>
+              <td>Computed loss value: <code>quantity * purchase_price</code></td>
+            </tr>
+            <tr>
+              <td><code>reason</code></td>
+              <td>VARCHAR</td>
+              <td>-</td>
+              <td>Reason: <code>'Expired'</code>, <code>'Spilled'</code>, <code>'Spoiled'</code>, etc.</td>
+            </tr>
+            <tr>
+              <td><code>created_at</code></td>
+              <td>TIMESTAMP</td>
+              <td>-</td>
+              <td>Timestamp when wastage was registered</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>D. <code>stock_adjustments</code> (Inventory Variance Audits)</h3>
+        <p>Keeps track of physical stock audit overrides and records variance checks with reasons.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Column Name</th>
+              <th>Data Type</th>
+              <th>Reference</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>Primary Key (AI)</td>
+              <td>Audit ID</td>
+            </tr>
+            <tr>
+              <td><code>branch_id</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>Branch identifier</td>
+            </tr>
+            <tr>
+              <td><code>raw_material_id</code></td>
+              <td>INT</td>
+              <td>Foreign Key -> <code>raw_materials.id</code></td>
+              <td>Modified ingredient</td>
+            </tr>
+            <tr>
+              <td><code>previous_quantity</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>Stock level prior to override (in consume units)</td>
+            </tr>
+            <tr>
+              <td><code>new_quantity</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>Stock level post override (in consume units)</td>
+            </tr>
+            <tr>
+              <td><code>variance</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>Difference: <code>new_quantity - previous_quantity</code></td>
+            </tr>
+            <tr>
+              <td><code>reason</code></td>
+              <td>VARCHAR</td>
+              <td>-</td>
+              <td>Reason: <code>'Counting Error'</code>, <code>'Pilferage'</code>, <code>'Damage'</code>, etc.</td>
+            </tr>
+            <tr>
+              <td><code>comments</code></td>
+              <td>TEXT</td>
+              <td>-</td>
+              <td>Custom notes written by auditor</td>
+            </tr>
+            <tr>
+              <td><code>created_at</code></td>
+              <td>TIMESTAMP</td>
+              <td>-</td>
+              <td>Timestamp of stock override action</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>E. <code>production</code> (In-House Cooking Production Records)</h3>
+        <p>Maintains history of recipe conversion execution runs.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Column Name</th>
+              <th>Data Type</th>
+              <th>Reference</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>Primary Key (AI)</td>
+              <td>Production Run ID</td>
+            </tr>
+            <tr>
+              <td><code>branch_id</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>Branch identifier</td>
+            </tr>
+            <tr>
+              <td><code>item_id</code></td>
+              <td>INT</td>
+              <td>Foreign Key -> <code>items.id</code></td>
+              <td>Prepared final menu item</td>
+            </tr>
+            <tr>
+              <td><code>recipe_id</code></td>
+              <td>INT</td>
+              <td>Foreign Key -> <code>recipes.id</code></td>
+              <td>Active recipe formulation bill of materials</td>
+            </tr>
+            <tr>
+              <td><code>produce_quantity</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>Yield volume produced</td>
+            </tr>
+            <tr>
+              <td><code>produce_unit_id</code></td>
+              <td>INT</td>
+              <td>Foreign Key -> <code>units.id</code></td>
+              <td>Yield Unit matching the recipe</td>
+            </tr>
+            <tr>
+              <td><code>status</code></td>
+              <td>VARCHAR</td>
+              <td>-</td>
+              <td>Defaulted to <code>'completed'</code></td>
+            </tr>
+            <tr>
+              <td><code>created_by</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>User ID of the employee executing</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>3. Backend API Directory</h2>
+        <p>Below is the catalog of REST endpoints added or refactored to support inventory functions:</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>API Endpoint</th>
+              <th>Request Payload (JSON Body)</th>
+              <th>Database Operations & Business Logic</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-post">POST</span></td>
+              <td><code>/api/invoices/create</code></td>
+              <td><code>{ total_amount, payment_status, items: [{ item_id, quantity, price }] }</code></td>
+              <td>Inserts invoice transactions and executes nested BOM recipe material calculations to deduct matching raw materials from <code>raw_material_stock</code> in a SQL transaction.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-get">GET</span></td>
+              <td><code>/api/invoices/list</code></td>
+              <td>None</td>
+              <td>Retrieves billing transactions history for the branch.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-post">POST</span></td>
+              <td><code>/api/wastage/create</code></td>
+              <td><code>[{ raw_material_id, quantity, reason }]</code></td>
+              <td>Calculates cost of loss per item using conversion factors and averages, writes bulk rows to <code>wastage_records</code>, and subtracts ingredients from <code>raw_material_stock</code>.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-get">GET</span></td>
+              <td><code>/api/wastage/list</code></td>
+              <td>None</td>
+              <td>Queries wastage entries joined with unit symbols formatted in purchase units.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-delete">DELETE</span></td>
+              <td><code>/api/wastage/:id</code></td>
+              <td>None (ID in params)</td>
+              <td>Deletes the wastage record, converts the saved purchase-unit quantity back to consume-units, and increments <code>raw_material_stock</code> to restore stock.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-post">POST</span></td>
+              <td><code>/api/stock/stockOverride</code></td>
+              <td><code>{ raw_material_id, new_quantity, reason, comments }</code></td>
+              <td>Fetches existing consume stock, updates it to <code>new_quantity</code>, computes variance, and logs details in <code>stock_adjustments</code>.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-get">GET</span></td>
+              <td><code>/api/stock/stockSummaryReport</code></td>
+              <td>Query params: <code>startDate</code>, <code>endDate</code>, <code>unitType</code></td>
+              <td>Runs complex aggregations to reconstruct historical Opening, Purchase, Excess, Consumed, Wasted, Adjusted, and Closing stock balances scaled to "Purchase" or "Consume" unit types.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-post">POST</span></td>
+              <td><code>/api/recipe/update</code></td>
+              <td><code>{ item_id, item_quantity, item_unit_id, materials: [...] }</code></td>
+              <td>Sets previous active recipes for this item to <code>is_active = 0</code> and inserts the updated active recipe BOM.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-put">PUT</span></td>
+              <td><code>/api/item/update/:id</code></td>
+              <td><code>{ name, category, selling_price, item_unit_id }</code></td>
+              <td>Updates item details in the master database.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-delete">DELETE</span></td>
+              <td><code>/api/item/delete/:id</code></td>
+              <td>None</td>
+              <td>Soft-deletes the selected item by setting `is_active = 0` in the database.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-get">GET</span></td>
+              <td><code>/api/item/logs/:id</code></td>
+              <td>None</td>
+              <td>Retrieves item creation timestamp, recipe mapping timestamp, and historical production runs.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>4. Frontend Screen Mappings</h2>
+        <p>How the React components connect and interact with these APIs:</p>
+        <ul>
+          <li><strong>Create Invoice Screen (<code>CreateInvoice.jsx</code>)</strong>: Sends billing rows to <code>POST /api/invoices/create</code> upon checking out. Auto-deducts recipe materials on the backend in real-time.</li>
+          <li><strong>Wastage Log Panel (<code>Wastage.jsx</code>)</strong>: Feeds bulk item lists to <code>POST /api/wastage/create</code> using purchase units. Allows reversing/deleting entries using <code>DELETE /api/wastage/:id</code>.</li>
+          <li><strong>Stock Adjustment Panel (<code>AvailableStock.jsx</code>)</strong>: Provides dropdowns for variance reasons and custom comment fields. Submits overrides to <code>POST /api/stock/stockOverride</code>.</li>
+          <li><strong>Production Execution Console (<code>ProductionExecution.jsx</code>)</strong>: Side-by-side checked items selection. Checks stock levels dynamically on the client, and sends production orders to <code>POST /api/production/create</code> using the recipe's specific yield unit (not selling unit).</li>
+          <li><strong>Item Creation & Actions (<code>ItemCreation.jsx</code>)</strong>:
+            <ul>
+              <li>Clipboard button opens <em>Audit Logs Dialog</em> fetching logs via <code>GET /api/item/logs/:id</code>.</li>
+              <li>Pencil button opens <em>Edit Dialog</em> updating attributes via <code>PUT /api/item/update/:id</code>.</li>
+              <li>Cross button soft-deletes row via <code>DELETE /api/item/delete/:id</code>.</li>
+            </ul>
+          </li>
+          <li><strong>Stock Summary Dashboard (<code>StockSummary.jsx</code>)</strong>: Pulls consolidated logs using <code>GET /api/stock/stockSummaryReport</code>. Calculates physical stock differences dynamically.</li>
+        </ul>
+
+        <h2>5. Development Environment Auto-Restart</h2>
+        <p>To improve development speed, the backend environment was configured with <strong>nodemon</strong>. By running the start script:
+        <br><code>npm start</code>
+        <br>It starts Node with nodemon watching file formats <code>.js</code>, <code>.json</code>. When any file edits are saved, the server auto-restarts, immediately deploying changes to port <code>5000</code>.</p>
+      </div>
+
+      <!-- ================= HINDI SECTION ================= -->
+      <div id="hindi-content" class="report-content">
+        <h1 style="text-align: center; margin-bottom: 30px; color: #b91c1c; font-family: 'Noto Sans Devanagari';">पेटपूजा इन्वेंटरी एकीकरण रिपोर्ट</h1>
+        
+        <h2>1. प्रोजेक्ट का अवलोकन (Project Overview)</h2>
+        <p>यह वेब एप्लिकेशन एक व्यापक रेस्टोरेंट इन्वेंटरी, रेसिपी मैपिंग, प्रोडक्शन निष्पादन और बिलिंग प्रबंधन प्रणाली है। यह <strong>React + Electron</strong> (डेस्कटॉप निष्पादन के लिए) में निर्मित फ़्रंटएंड इंटरफ़ेस और <strong>Node.js (Express) और MariaDB</strong> द्वारा संचालित बैकएंड REST API को एकीकृत करता है।</p>
+        <p>मुख्य डेटा प्रवाह निम्नलिखित प्रकार से संचालित होता है:</p>
+        <p style="font-weight: 600; text-align: center; background-color: #fef2f2; padding: 12px; border-radius: 8px; color: #b91c1c;">
+          आइटम मास्टर (Item) → वेंडर मास्टर (Vendor) → परचेज आर्डर (PO) → GRN/स्टॉक परचेज → स्टॉक इन → रेसिपी मैपिंग → POS बिलिंग (ऑटो-कंजम्पशन) → स्टॉक समायोजन/वेस्टेज → रिपोर्ट्स और डैशबोर्ड
+        </p>
+
+        <h2>2. डेटाबेस स्कीमा और मैप किया गया डेटा</h2>
+        <p>लेनदेन, ट्रैकिंग और लॉग्स को रिकॉर्ड करने के लिए डेटाबेस स्कीमा में सुधार किए गए हैं और नई टेबल्स जोड़ी गई हैं:</p>
+
+        <h3>A. <code>sales_invoices</code> (POS बिलिंग लेनदेन)</h3>
+        <p>बिलिंग लेनदेन की बुनियादी जानकारी दर्ज करता है।</p>
+        <table>
+          <thead>
+            <tr>
+              <th>कॉलम का नाम</th>
+              <th>डेटा टाइप</th>
+              <th>कुंजी / संदर्भ</th>
+              <th>विवरण</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>प्राइमरी की (AI)</td>
+              <td>विशिष्ट इनवॉइस आईडी</td>
+            </tr>
+            <tr>
+              <td><code>branch_id</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>शाखा (Branch) की पहचान</td>
+            </tr>
+            <tr>
+              <td><code>invoice_number</code></td>
+              <td>VARCHAR</td>
+              <td>विशिष्ट (Unique)</td>
+              <td>इनवॉइस संदर्भ संख्या</td>
+            </tr>
+            <tr>
+              <td><code>total_amount</code></td>
+              <td>DECIMAL(10,2)</td>
+              <td>-</td>
+              <td>कुल बिलिंग राशि</td>
+            </tr>
+            <tr>
+              <td><code>payment_status</code></td>
+              <td>VARCHAR</td>
+              <td>-</td>
+              <td>भुगतान स्थिति: <code>'paid'</code>, <code>'unpaid'</code>, <code>'pending'</code></td>
+            </tr>
+            <tr>
+              <td><code>created_at</code></td>
+              <td>TIMESTAMP</td>
+              <td>-</td>
+              <td>बिल बनने की तारीख और समय</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>B. <code>sales_invoice_items</code> (बेचे गए बिल आइटम्स)</h3>
+        <p>प्रत्येक बिल लेनदेन में बेचे गए विशिष्ट आइटम्स की मात्रा और कीमत को ट्रैक करता है।</p>
+        <table>
+          <thead>
+            <tr>
+              <th>कॉलम का नाम</th>
+              <th>डेटा टाइप</th>
+              <th>संदर्भ (Reference)</th>
+              <th>विवरण</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>प्राइमरी की (AI)</td>
+              <td>सोल्ड आइटम आईडी</td>
+            </tr>
+            <tr>
+              <td><code>invoice_id</code></td>
+              <td>INT</td>
+              <td>फॉरेन की -> <code>sales_invoices.id</code></td>
+              <td>संबद्ध मुख्य इनवॉइस</td>
+            </tr>
+            <tr>
+              <td><code>item_id</code></td>
+              <td>INT</td>
+              <td>फॉरेन की -> <code>items.id</code></td>
+              <td>बेचा गया फाइनल मेनू आइटम</td>
+            </tr>
+            <tr>
+              <td><code>quantity</code></td>
+              <td>DECIMAL(10,2)</td>
+              <td>-</td>
+              <td>बेची गई मात्रा</td>
+            </tr>
+            <tr>
+              <td><code>price</code></td>
+              <td>DECIMAL(10,2)</td>
+              <td>-</td>
+              <td>बेची गई दर (सेलिंग प्राइस)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>C. <code>wastage_records</code> (कच्चे माल की बर्बादी/वेस्टेज)</h3>
+        <p>कच्चे माल (रॉ मटेरियल) की बर्बादी को दर्ज करता है, वित्तीय नुकसान की गणना करता है और स्टॉक से मात्रा घटाता है।</p>
+        <table>
+          <thead>
+            <tr>
+              <th>कॉलम का नाम</th>
+              <th>डेटा टाइप</th>
+              <th>संदर्भ</th>
+              <th>विवरण</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>प्राइमरी की (AI)</td>
+              <td>वेस्टेज लॉग आईडी</td>
+            </tr>
+            <tr>
+              <td><code>branch_id</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>वेस्टेज होने वाली शाखा की आईडी</td>
+            </tr>
+            <tr>
+              <td><code>raw_material_id</code></td>
+              <td>INT</td>
+              <td>फॉरेन की -> <code>raw_materials.id</code></td>
+              <td>बर्बाद हुए कच्चे माल की आईडी</td>
+            </tr>
+            <tr>
+              <td><code>quantity</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>बर्बाद मात्रा (परचेज यूनिट जैसे kg/ltr में)</td>
+            </tr>
+            <tr>
+              <td><code>loss_amount</code></td>
+              <td>DECIMAL(10,2)</td>
+              <td>-</td>
+              <td>नुकसान मूल्य: <code>मात्रा * औसत खरीद मूल्य</code></td>
+            </tr>
+            <tr>
+              <td><code>reason</code></td>
+              <td>VARCHAR</td>
+              <td>-</td>
+              <td>बर्बादी का कारण: <code>'Expired'</code>, <code>'Spilled'</code>, आदि</td>
+            </tr>
+            <tr>
+              <td><code>created_at</code></td>
+              <td>TIMESTAMP</td>
+              <td>-</td>
+              <td>वेस्टेज दर्ज होने का समय</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>D. <code>stock_adjustments</code> (स्टॉक समायोजन/ऑडिट लॉग)</h3>
+        <p>वास्तविक फिजिकल स्टॉक और डेटाबेस स्टॉक में आने वाले अंतर (Variance) का ऑडिट विवरण रखता है।</p>
+        <table>
+          <thead>
+            <tr>
+              <th>कॉलम का नाम</th>
+              <th>डेटा टाइप</th>
+              <th>संदर्भ</th>
+              <th>विवरण</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>प्राइमरी की (AI)</td>
+              <td>समायोजन लॉग आईडी</td>
+            </tr>
+            <tr>
+              <td><code>branch_id</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>शाखा पहचानकर्ता</td>
+            </tr>
+            <tr>
+              <td><code>raw_material_id</code></td>
+              <td>INT</td>
+              <td>फॉरेन की -> <code>raw_materials.id</code></td>
+              <td>समायोजित कच्चा माल</td>
+            </tr>
+            <tr>
+              <td><code>previous_quantity</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>समायोजन से पहले का स्टॉक (कंज्यूम यूनिट में)</td>
+            </tr>
+            <tr>
+              <td><code>new_quantity</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>समायोजन के बाद का नया स्टॉक (कंज्यूम यूनिट में)</td>
+            </tr>
+            <tr>
+              <td><code>variance</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>स्टॉक अंतर: <code>new_quantity - previous_quantity</code></td>
+            </tr>
+            <tr>
+              <td><code>reason</code></td>
+              <td>VARCHAR</td>
+              <td>-</td>
+              <td>कारण: <code>'Counting Error'</code>, <code>'Pilferage'</code>, आदि</td>
+            </tr>
+            <tr>
+              <td><code>comments</code></td>
+              <td>TEXT</td>
+              <td>-</td>
+              <td>ऑडिटर द्वारा लिखी गई टिप्पणी</td>
+            </tr>
+            <tr>
+              <td><code>created_at</code></td>
+              <td>TIMESTAMP</td>
+              <td>-</td>
+              <td>स्टॉक सुधार की तारीख और समय</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>E. <code>production</code> (आन्तरिक प्रोडक्शन रन)</h3>
+        <p>रेसिपी मैपिंग के आधार पर तैयार किए गए इन-हाउस फूड प्रोडक्शन रन का रिकॉर्ड रखता है।</p>
+        <table>
+          <thead>
+            <tr>
+              <th>कॉलम का नाम</th>
+              <th>डेटा टाइप</th>
+              <th>संदर्भ</th>
+              <th>विवरण</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td>INT</td>
+              <td>प्राइमरी की (AI)</td>
+              <td>प्रोडक्शन रन आईडी</td>
+            </tr>
+            <tr>
+              <td><code>branch_id</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>शाखा पहचानकर्ता</td>
+            </tr>
+            <tr>
+              <td><code>item_id</code></td>
+              <td>INT</td>
+              <td>फॉरेन की -> <code>items.id</code></td>
+              <td>तैयार किया गया खाद्य आइटम</td>
+            </tr>
+            <tr>
+              <td><code>recipe_id</code></td>
+              <td>INT</td>
+              <td>फॉरेन की -> <code>recipes.id</code></td>
+              <td>प्रयुक्त एक्टिव रेसिपी फॉर्मूलेशन</td>
+            </tr>
+            <tr>
+              <td><code>produce_quantity</code></td>
+              <td>DECIMAL(10,3)</td>
+              <td>-</td>
+              <td>उत्पादित कुल मात्रा</td>
+            </tr>
+            <tr>
+              <td><code>produce_unit_id</code></td>
+              <td>INT</td>
+              <td>फॉरेन की -> <code>units.id</code></td>
+              <td>रेसिपी के अनुसार प्रयुक्त यील्ड यूनिट</td>
+            </tr>
+            <tr>
+              <td><code>status</code></td>
+              <td>VARCHAR</td>
+              <td>-</td>
+              <td>डिफ़ॉल्ट रूप से <code>'completed'</code></td>
+            </tr>
+            <tr>
+              <td><code>created_by</code></td>
+              <td>INT</td>
+              <td>-</td>
+              <td>ऑपरेटर की यूजर आईडी</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>3. बैकएंड एपीआई सूची (Backend API Directory)</h2>
+        <p>इन्वेंटरी और बिलिंग कार्यों का समर्थन करने वाले बैकएंड एंडपॉइंट्स की सूची:</p>
+        <table>
+          <thead>
+            <tr>
+              <th>विधि (Method)</th>
+              <th>एपीआई एंडपॉइंट</th>
+              <th>रिक्वेस्ट बॉडी (JSON)</th>
+              <th>बिजनेस लॉजिक और डेटाबेस ऑपरेशन्स</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-post">POST</span></td>
+              <td><code>/api/invoices/create</code></td>
+              <td><code>{ total_amount, payment_status, items: [...] }</code></td>
+              <td>इनवॉइस डेटा इंसर्ट करता है और रेसिपी के अनुसार कच्चे माल की मात्रा को ऑटोमैटिकली डिडक्ट करता है।</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-get">GET</span></td>
+              <td><code>/api/invoices/list</code></td>
+              <td>None</td>
+              <td>शाखा के बिलिंग लेनदेन का इतिहास देता है।</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-post">POST</span></td>
+              <td><code>/api/wastage/create</code></td>
+              <td><code>[{ raw_material_id, quantity, reason }]</code></td>
+              <td>परचेस यूनिट से स्टॉक घटाने के लिए कनवर्टर लगाकर डेटा वेस्टेज लॉग में बल्क इंसर्ट करता है।</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-get">GET</span></td>
+              <td><code>/api/wastage/list</code></td>
+              <td>None</td>
+              <td>वेस्टेज प्रविष्टियों की सूची परचेस यूनिट प्रतीकों के साथ प्रस्तुत करता है।</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-delete">DELETE</span></td>
+              <td><code>/api/wastage/:id</code></td>
+              <td>None (आईडी पाथ में)</td>
+              <td>वेस्टेज रिकॉर्ड हटाता है और स्टॉक में पहले डिडक्ट की गई मात्रा को वापस जोड़ (Add Back) देता है।</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-post">POST</span></td>
+              <td><code>/api/stock/stockOverride</code></td>
+              <td><code>{ raw_material_id, new_quantity, reason, comments }</code></td>
+              <td>स्टॉक ओवरराइड करता है और अंतर को गणना कर <code>stock_adjustments</code> में लॉग करता.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-get">GET</span></td>
+              <td><code>/api/stock/stockSummaryReport</code></td>
+              <td>कुएरी: <code>startDate</code>, <code>endDate</code>, <code>unitType</code></td>
+              <td>Opening, Purchase, Consumed, Wastage, Adjustment और Closing स्टॉक का पूर्ण दैनिक रिपोर्ट डेटा देता है।</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-post">POST</span></td>
+              <td><code>/api/recipe/update</code></td>
+              <td><code>{ item_id, item_quantity, item_unit_id, materials: [...] }</code></td>
+              <td>पुरानी एक्टिव रेसिपी को डी-एक्टिवेट करके नई सामग्री सूची इंसर्ट करता है।</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-put">PUT</span></td>
+              <td><code>/api/item/update/:id</code></td>
+              <td><code>{ name, category, selling_price, item_unit_id }</code></td>
+              <td>मास्टर डेटाबेस में आइटम की जानकारी अपडेट करता है।</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-delete">DELETE</span></td>
+              <td><code>/api/item/delete/:id</code></td>
+              <td>None</td>
+              <td>आइटम को सॉफ्ट-डिलीट (`is_active = 0`) करता है।</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-get">GET</span></td>
+              <td><code>/api/item/logs/:id</code></td>
+              <td>None</td>
+              <td>आइटम क्रिएशन डेट, रेसिपी क्रिएशन डेट और पुराने प्रोडक्शन रन लॉग करता है।</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>4. फ़्रंटएंड स्क्रीन मैपिंग (Frontend Mappings)</h2>
+        <p>रिएक्ट घटक इन APIs के साथ इस प्रकार जुड़ते हैं:</p>
+        <ul>
+          <li><strong>Create Invoice (<code>CreateInvoice.jsx</code>)</strong>: बिल सेव होने पर <code>POST /api/invoices/create</code> को कॉल करता है, जिससे कच्चे माल की मात्रा बैकएंड पर तुरंत कम हो जाती है।</li>
+          <li><strong>Wastage Screen (<code>Wastage.jsx</code>)</strong>: वेस्टेज प्रविष्टि जोड़ने पर <code>POST /api/wastage/create</code> और रद्द करने पर <code>DELETE /api/wastage/:id</code> का उपयोग करता है।</li>
+          <li><strong>Stock Adjustment (<code>AvailableStock.jsx</code>)</strong>: स्टॉक अपडेट करते समय ओवरराइड डेटा <code>POST /api/stock/stockOverride</code> पर भेजता है।</li>
+          <li><strong>Production Execution (<code>ProductionExecution.jsx</code>)</strong>: रेसिपी की यील्ड यूनिट (जैसे `Pcs`) प्रदर्शित करता है और <code>POST /api/production/create</code> के जरिए प्रोडक्शन रन शुरू करता है।</li>
+          <li><strong>Item Creation (<code>ItemCreation.jsx</code>)</strong>:
+            <ul>
+              <li>पहला बटन (Clipboard): <code>GET /api/item/logs/:id</code> के जरिए ऑडिट लॉग दिखाता है।</li>
+              <li>दूसरा बटन (Pencil): <code>PUT /api/item/update/:id</code> के द्वारा आइटम एडिट करता है।</li>
+              <li>तीसरा बटन (Cross): <code>DELETE /api/item/delete/:id</code> के जरिए सॉफ्ट-डिलीट करता है।</li>
+            </ul>
+          </li>
+          <li><strong>Stock Summary Report (<code>StockSummary.jsx</code>)</strong>: <code>GET /api/stock/stockSummaryReport</code> से दैनिक डेटा प्राप्त करता है और अंतर की गणना करता है।</li>
+        </ul>
+
+        <h2>5. विकास पर्यावरण ऑटो-रिस्टार्ट कॉन्फ़िगरेशन</h2>
+        <p>विकास को आसान बनाने के लिए बैकएंड में <strong>nodemon</strong> कॉन्फ़िगर किया गया है। अब टर्मिनल पर केवल:
+        <br><code>npm start</code>
+        <br>चलाने से nodemon सर्वर को फाइलों में होने वाले बदलावों के लिए ट्रैक करता है। जैसे ही आप कोई फाइल सेव करेंगे, सर्वर तुरंत ऑटो-रिस्टार्ट होकर पोर्ट `5000` पर अपडेट हो जाएगा।</p>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function switchTab(lang) {
+      // Remove active class from all buttons and content
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.report-content').forEach(content => content.classList.remove('active'));
+      
+      if (lang === 'english') {
+        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+        document.getElementById('english-content').classList.add('active');
+        document.querySelector('.report-card').classList.remove('dual-grid');
+      } else if (lang === 'hindi') {
+        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        document.getElementById('hindi-content').classList.add('active');
+        document.querySelector('.report-card').classList.remove('dual-grid');
+      } else if (lang === 'dual') {
+        document.querySelector('.tab-btn:nth-child(3)').classList.add('active');
+        document.getElementById('english-content').classList.add('active');
+        document.getElementById('hindi-content').classList.add('active');
+        
+        // Wrap contents in columns if dual view is selected
+        document.querySelector('.report-card').classList.add('dual-grid');
+        document.getElementById('english-content').classList.add('dual-col');
+        document.getElementById('hindi-content').classList.add('dual-col');
+      }
+    }
+  </script>
+</body>
+</html>
