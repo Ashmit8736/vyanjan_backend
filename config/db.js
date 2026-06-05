@@ -1,19 +1,24 @@
 import mysql from "mysql2/promise";
 
-let connection; 
+let pool; 
 
 const connectDB = async () => {
-  if (!connection) {
-    connection = await mysql.createConnection({
+  if (!pool) {
+    pool = mysql.createPool({
       host: process.env.DB_HOST,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME
+      database: process.env.DB_NAME,
+      waitForConnections: true,
+      connectionLimit: 15,
+      queueLimit: 0,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000
     });
 
-    console.log("✅ MariaDB Connected Successfully");
+    console.log("✅ MariaDB Connection Pool Created Successfully");
   }
-  return connection;
+  return pool;
 };
 
 export default connectDB;

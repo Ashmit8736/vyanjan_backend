@@ -1,7 +1,8 @@
 import connectDB from "../config/db.js";
 
 export const createPurchaseOrder = async (data, items) => {
-  const conn = await connectDB();
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
 
   try {
     await conn.beginTransaction();
@@ -41,6 +42,8 @@ export const createPurchaseOrder = async (data, items) => {
   } catch (error) {
     await conn.rollback();
     throw error;
+  } finally {
+    conn.release();
   }
 };
 

@@ -13,6 +13,8 @@ import stockPurchaseItemRoutes from "./routes/stockPurchaseItemRoutes.js";
 import itemRoutes from "./routes/itemRoutes.js";
 import recipeRoutes from "./routes/recipeRoutes.js";
 import productionRoutes from "./routes/producationRoute.js"
+import salesInvoiceRoutes from "./routes/salesInvoiceRoutes.js";
+import wastageRoutes from "./routes/wastageRoutes.js";
 
 const app = express();
 
@@ -37,6 +39,8 @@ app.use("/api/item", itemRoutes);
 app.use("/api/recipe", recipeRoutes);
 
 app.use("/api/production", productionRoutes);
+app.use("/api/invoices", salesInvoiceRoutes);
+app.use("/api/wastage", wastageRoutes);
 
 
 export default app;

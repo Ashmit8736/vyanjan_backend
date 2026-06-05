@@ -9,7 +9,8 @@ export const createProduction = async ({
     produce_unit_id,
     created_by
 }) => {
-    const conn = await connectDB();
+    const pool = await connectDB();
+    const conn = await pool.getConnection();
 
     try {
         await conn.beginTransaction();
@@ -27,8 +28,7 @@ export const createProduction = async ({
         }
 
         /* 2️⃣ Calculate recipe count */
-        // const recipeCount = produce_quantity / recipe.item_quantity;
-        const recipeCount = produce_quantity;
+        const recipeCount = Number(produce_quantity) / Number(recipe.item_quantity || 1);
 
 
         /* 3️⃣ Get recipe materials */
@@ -132,6 +132,8 @@ export const createProduction = async ({
     } catch (error) {
         await conn.rollback();
         throw error;
+    } finally {
+        conn.release();
     }
 };
 
@@ -144,15 +146,16 @@ export const getProductionByBranch = async (branch_id) => {
 
     const [rows] = await conn.execute(
         `SELECT
-        p.id,
-        p.produce_quantity,
-        p.status,
-        p.produced_at,
+         p.id,
+         p.item_id,
+         p.produce_quantity,
+         p.status,
+         p.produced_at,
 
-        i.name AS item_name,
+         i.name AS item_name,
 
-        u.unit_name,
-        u.unit_symbol
+         u.unit_name,
+         u.unit_symbol
 
      FROM production p
 
