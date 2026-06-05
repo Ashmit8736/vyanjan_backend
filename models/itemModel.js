@@ -3,53 +3,39 @@ import connectDB from "../config/db.js";
 /**
  * Create Item
  */
-export const createItem = async (branch_id, name, category, selling_price, item_unit_id) => {
+export const createItem = async (
+  branch_id,
+  name,
+  category,
+  selling_price,
+  item_unit_id,
+  short_code = null,
+  stock_status = "In Stock",
+  favorite = 0
+) => {
   const conn = await connectDB();
 
   const [result] = await conn.execute(
-    `INSERT INTO items (branch_id, name, category, selling_price, item_unit_id)
-     VALUES (?, ?, ?, ?, ?)`,
-    [branch_id, name, category, selling_price, item_unit_id || null]
+    `INSERT INTO items (branch_id, name, category, selling_price, item_unit_id, short_code, stock_status, favorite)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      branch_id,
+      name,
+      category || null,
+      selling_price || 0,
+      item_unit_id || null,
+      short_code || null, 
+      stock_status || "In Stock",
+      favorite ? 1 : 0
+    ]
   );
 
   return result.insertId;
 };
 
-
-// export const getItemsByBranch = async (branch_id) => {
-//   const conn = await connectDB();
-
-//   const [rows] = await conn.execute(
-//     `SELECT 
-//         i.id,
-//         i.name,
-//         i.category,
-//         i.selling_price,
-
-//         r.item_quantity,
-//         u.unit_name   AS item_unit_name,
-//         u.unit_symbol AS item_unit_symbol
-
-//      FROM items i
-
-//      LEFT JOIN recipes r 
-//        ON r.item_id = i.id
-//        AND r.is_active = 1
-
-//      LEFT JOIN units u
-//        ON u.id = r.item_unit_id
-
-//      WHERE i.branch_id = ?
-//        AND i.is_active = 1
-
-//      ORDER BY i.id DESC`,
-//     [branch_id]
-//   );
-
-//   return rows;
-// };
-
-
+/**
+ * Get items by branch
+ */
 export const getItemsByBranch = async (branch_id) => {
   const conn = await connectDB();
 
@@ -61,6 +47,9 @@ export const getItemsByBranch = async (branch_id) => {
         i.selling_price,
         i.created_at,
         i.item_unit_id,
+        i.short_code,
+        i.stock_status,
+        i.favorite,
 
         r.id            AS recipe_id,        -- ✅ REQUIRED
         r.item_quantity,
@@ -94,19 +83,45 @@ export const getItemsByBranch = async (branch_id) => {
   return rows;
 };
 
-export const updateItem = async (id, branch_id, name, category, selling_price, item_unit_id) => {
+/**
+ * Update Item
+ */
+export const updateItem = async (
+  id,
+  branch_id,
+  name,
+  category,
+  selling_price,
+  item_unit_id,
+  short_code = null,
+  stock_status = "In Stock",
+  favorite = 0
+) => {
   const conn = await connectDB();
 
   const [result] = await conn.execute(
     `UPDATE items 
-     SET name = ?, category = ?, selling_price = ?, item_unit_id = ? 
+     SET name = ?, category = ?, selling_price = ?, item_unit_id = ?, short_code = ?, stock_status = ?, favorite = ?
      WHERE id = ? AND branch_id = ?`,
-    [name, category, selling_price, item_unit_id || null, id, branch_id]
+    [
+      name,
+      category || null,
+      selling_price || 0,
+      item_unit_id || null,
+      short_code || null,
+      stock_status || "In Stock",
+      favorite ? 1 : 0,
+      id,
+      branch_id
+    ]
   );
 
   return result;
 };
 
+/**
+ * Delete Item (Soft Delete)
+ */
 export const deleteItem = async (id, branch_id) => {
   const conn = await connectDB();
 
@@ -118,6 +133,9 @@ export const deleteItem = async (id, branch_id) => {
   return result;
 };
 
+/**
+ * Get Item Audit Logs
+ */
 export const getItemLogs = async (id, branch_id) => {
   const conn = await connectDB();
 
@@ -150,3 +168,25 @@ export const getItemLogs = async (id, branch_id) => {
     production_runs: productionRuns
   };
 };
+
+/**
+ * Check for duplicate item name in the same branch (case-insensitive)
+ * If excludeId is provided, excludes that ID (useful for item updates)
+ */
+export const checkDuplicateItem = async (name, branch_id, excludeId = null) => {
+  const conn = await connectDB();
+  if (excludeId) {
+    const [rows] = await conn.execute(
+      `SELECT id FROM items WHERE LOWER(name) = LOWER(?) AND branch_id = ? AND is_active = 1 AND id != ?`,
+      [name, branch_id, excludeId]
+    );
+    return rows.length > 0;
+  } else {
+    const [rows] = await conn.execute(
+      `SELECT id FROM items WHERE LOWER(name) = LOWER(?) AND branch_id = ? AND is_active = 1`,
+      [name, branch_id]
+    );
+    return rows.length > 0;
+  }
+};
+

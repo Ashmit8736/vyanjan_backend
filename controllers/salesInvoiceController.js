@@ -133,3 +133,72 @@ export const getSalesInvoicesController = async (req, res) => {
     });
   }
 };
+
+export const getSalesDashboardStatsController = async (req, res) => {
+  try {
+    const pool = await connectDB();
+    const branch_id = req.user.branch_id;
+
+    // 1. Total Revenue
+    const [[{ total_revenue }]] = await pool.execute(
+      `SELECT COALESCE(SUM(total), 0) AS total_revenue 
+       FROM sales_invoices 
+       WHERE branch_id = ? AND status = 'Paid'`,
+      [branch_id]
+    );
+
+    // 2. Total Invoices Count
+    const [[{ total_invoices }]] = await pool.execute(
+      `SELECT COUNT(*) AS total_invoices 
+       FROM sales_invoices 
+       WHERE branch_id = ?`,
+      [branch_id]
+    );
+
+    // 3. Pending Payments
+    const [[{ pending_payments }]] = await pool.execute(
+      `SELECT COALESCE(SUM(total), 0) AS pending_payments 
+       FROM sales_invoices 
+       WHERE branch_id = ? AND (status = 'Pending' OR status = 'Unpaid')`,
+      [branch_id]
+    );
+
+    // 4. Paid This Month
+    const [[{ paid_this_month }]] = await pool.execute(
+      `SELECT COALESCE(SUM(total), 0) AS paid_this_month 
+       FROM sales_invoices 
+       WHERE branch_id = ? AND status = 'Paid' 
+         AND MONTH(created_at) = MONTH(CURRENT_DATE()) 
+         AND YEAR(created_at) = YEAR(CURRENT_DATE())`,
+      [branch_id]
+    );
+
+    // 5. Recent Invoices (Latest 5)
+    const [recent_invoices] = await pool.execute(
+      `SELECT id, client_name AS client, total AS amount, status 
+       FROM sales_invoices
+       WHERE branch_id = ?
+       ORDER BY created_at DESC
+       LIMIT 5`,
+      [branch_id]
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total_revenue: Number(total_revenue),
+        total_invoices: Number(total_invoices),
+        pending_payments: Number(pending_payments),
+        paid_this_month: Number(paid_this_month),
+        recent_invoices
+      }
+    });
+  } catch (error) {
+    console.error("❌ Fetch Dashboard Stats Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch dashboard stats",
+      error: error.message
+    });
+  }
+};
