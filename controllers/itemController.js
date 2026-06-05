@@ -1,19 +1,11 @@
-import { createItem, getItemsByBranch, updateItem, deleteItem, getItemLogs } from "../models/itemModel.js";
+import { createItem, getItemsByBranch, updateItem, deleteItem, getItemLogs, checkDuplicateItem } from "../models/itemModel.js";
 
 /**
   * Create item
   */
 export const createItemController = async (req, res) => {
   try {
-    const {
-      name,
-      category,
-      selling_price,
-      short_code,
-      stock_status,
-      item_unit_id,
-      favorite,
-    } = req.body;
+    const { name, category, selling_price, item_unit_id, short_code, stock_status, favorite } = req.body;
     const branch_id = req.user.branch_id;
 
     if (!name) {
@@ -23,15 +15,24 @@ export const createItemController = async (req, res) => {
       });
     }
 
+    // Check for duplicate active item name in the same branch
+    const isDuplicate = await checkDuplicateItem(name, branch_id);
+    if (isDuplicate) {
+      return res.status(400).json({
+        success: false,
+        message: "Item already exists (Duplicate entry)",
+      });
+    }
+
     const item_id = await createItem(
       branch_id,
       name,
       category || null,
       selling_price || 0,
-      short_code || null,
-      stock_status || "Do Not Track",
       item_unit_id || null,
-      favorite ? 1 : 0
+      short_code || null,
+      stock_status || "In Stock",
+      favorite ? Number(favorite) : 0
     );
 
     res.status(201).json({
@@ -137,11 +138,11 @@ export const getItemsController = async (req, res) => {
   }
 };
 
-// export const updateItemController = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { name, category, selling_price, item_unit_id } = req.body;
-//     const branch_id = req.user.branch_id;
+export const updateItemController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, category, selling_price, item_unit_id, short_code, stock_status, favorite } = req.body;
+    const branch_id = req.user.branch_id;
 
 //     if (!id || !name) {
 //       return res.status(400).json({
@@ -150,7 +151,26 @@ export const getItemsController = async (req, res) => {
 //       });
 //     }
 
-//     await updateItem(id, branch_id, name, category, Number(selling_price || 0), item_unit_id ? Number(item_unit_id) : null);
+    // Check for duplicate active item name in the same branch (excluding current item)
+    const isDuplicate = await checkDuplicateItem(name, branch_id, id);
+    if (isDuplicate) {
+      return res.status(400).json({
+        success: false,
+        message: "Item already exists with this name (Duplicate entry)",
+      });
+    }
+
+    await updateItem(
+      id,
+      branch_id,
+      name,
+      category,
+      Number(selling_price || 0),
+      item_unit_id ? Number(item_unit_id) : null,
+      short_code || null,
+      stock_status || "In Stock",
+      favorite ? Number(favorite) : 0
+    );
 
 //     res.status(200).json({
 //       success: true,
