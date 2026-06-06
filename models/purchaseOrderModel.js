@@ -11,8 +11,8 @@ export const createPurchaseOrder = async (data, items) => {
     const [poResult] = await conn.query(
       `INSERT INTO purchase_orders
       (branch_id, supplier_id, po_number, invoice_number,
-       purchase_date, sub_total, tax_amount, discount_amount, grand_total,payment_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+       purchase_date, sub_total, tax_amount, discount_amount, grand_total, payment_status, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       data
     );
 
@@ -61,9 +61,14 @@ export const getPurchaseOrdersByBranch = async (branchId) => {
         po.discount_amount,
         po.grand_total,
         po.payment_status,
+        po.status,
+        po.created_by,
         po.created_at,
         s.name AS supplier_name,
-        s.company_name
+        s.company_name,
+        (SELECT COALESCE(SUM(paid_amount), 0) 
+         FROM purchase_order_payments 
+         WHERE purchase_order_id = po.id AND status = 'Active') AS total_paid
      FROM purchase_orders po
      JOIN suppliers s ON s.id = po.supplier_id
      WHERE po.branch_id = ?

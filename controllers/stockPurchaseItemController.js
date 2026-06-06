@@ -205,3 +205,424 @@ export const getStockReport = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/* ===== CANCEL STOCK PURCHASE (REVERT STOCK) ===== */
+export const cancelStockPurchaseController = async (req, res) => {
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const { poId } = req.params;
+    const branch_id = req.user.branch_id;
+
+    // Check if PO exists and is completed
+    const [[po]] = await conn.query(
+      `SELECT id, status FROM purchase_orders WHERE id = ? AND branch_id = ?`,
+      [poId, branch_id]
+    );
+
+    if (!po) {
+      return res.status(404).json({ success: false, message: "Purchase order not found" });
+    }
+
+    if (po.status === 'cancelled') {
+      return res.status(400).json({ success: false, message: "Purchase order is already cancelled" });
+    }
+
+    // Revert stock if it was completed
+    if (po.status === 'completed') {
+      const [items] = await conn.query(
+        `SELECT raw_material_id, quantity FROM stock_purchase_items WHERE purchase_order_id = ?`,
+        [poId]
+      );
+
+      for (const item of items) {
+        const [[rm]] = await conn.query(
+          `SELECT conversion_factor FROM raw_materials WHERE id = ?`,
+          [item.raw_material_id]
+        );
+
+        const convertedQuantity = item.quantity * rm.conversion_factor;
+
+        await conn.query(
+          `UPDATE raw_material_stock
+           SET quantity = quantity - ?, last_updated_at = NOW()
+           WHERE raw_material_id = ? AND branch_id = ?`,
+          [convertedQuantity, item.raw_material_id, branch_id]
+        );
+      }
+    }
+
+    // Update PO status to cancelled
+    await conn.execute(
+      `UPDATE purchase_orders SET status = 'cancelled' WHERE id = ?`,
+      [poId]
+    );
+
+    await conn.commit();
+    res.json({ success: true, message: "Purchase order cancelled and stock reverted successfully" });
+
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ success: false, message: err.message });
+  } finally {
+    conn.release();
+  }
+};
+
+/* ===== UPDATE PAYMENT STATUS ===== */
+export const updatePaymentStatusController = async (req, res) => {
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
+  try {
+    const { poId } = req.params;
+    const { payment_status } = req.body;
+    const branch_id = req.user.branch_id;
+
+    await conn.execute(
+      `UPDATE purchase_orders SET payment_status = ? WHERE id = ? AND branch_id = ?`,
+      [payment_status, poId, branch_id]
+    );
+
+    res.json({ success: true, message: `Payment status updated to ${payment_status}` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  } finally {
+    conn.release();
+  }
+};
+
+/* ===== EDIT STOCK PURCHASE ITEMS & UPDATE STOCK ===== */
+export const editStockPurchaseItemsController = async (req, res) => {
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const branch_id = req.user.branch_id;
+    const { poId } = req.params;
+    const { invoice_number, invoice_date, payment_status, items } = req.body;
+
+    // 1. Fetch old stock purchase items to revert stock
+    const [oldItems] = await conn.query(
+      `SELECT raw_material_id, quantity FROM stock_purchase_items WHERE purchase_order_id = ?`,
+      [poId]
+    );
+
+    for (const item of oldItems) {
+      const [[rm]] = await conn.query(
+        `SELECT conversion_factor FROM raw_materials WHERE id = ?`,
+        [item.raw_material_id]
+      );
+      const convertedQuantity = item.quantity * rm.conversion_factor;
+
+      await conn.query(
+        `UPDATE raw_material_stock
+         SET quantity = quantity - ?, last_updated_at = NOW()
+         WHERE raw_material_id = ? AND branch_id = ?`,
+        [convertedQuantity, item.raw_material_id, branch_id]
+      );
+    }
+
+    // 2. Delete old stock purchase items
+    await conn.query(
+      `DELETE FROM stock_purchase_items WHERE purchase_order_id = ?`,
+      [poId]
+    );
+
+    // 3. Compute totals and update PO details
+    let subTotal = 0;
+    let taxAmount = 0;
+    let discountAmount = 0;
+
+    for (const item of items) {
+      const amount = item.quantity * item.unit_price;
+      subTotal += amount;
+
+      let cgstAmount = 0, sgstAmount = 0, igstAmount = 0;
+      if (item.igst_percent && item.igst_percent > 0) {
+        igstAmount = amount * (item.igst_percent / 100);
+      } else {
+        cgstAmount = amount * ((item.cgst_percent || 0) / 100);
+        sgstAmount = amount * ((item.sgst_percent || 0) / 100);
+      }
+      taxAmount += (cgstAmount + sgstAmount + igstAmount);
+      discountAmount += Number(item.item_discount || 0);
+    }
+
+    const grandTotal = subTotal + taxAmount - discountAmount;
+
+    await conn.execute(
+      `UPDATE purchase_orders
+       SET payment_status = ?,
+           invoice_number = ?,
+           purchase_date = ?,
+           sub_total = ?,
+           tax_amount = ?,
+           discount_amount = ?,
+           grand_total = ?,
+           status = 'completed'
+       WHERE id = ? AND branch_id = ?`,
+      [
+        payment_status || 'pending',
+        invoice_number || null,
+        invoice_date || null,
+        subTotal,
+        taxAmount,
+        discountAmount,
+        grandTotal,
+        poId,
+        branch_id
+      ]
+    );
+
+    // 4. Save new stock purchase items and apply new stock
+    for (const item of items) {
+      const [[rm]] = await conn.query(
+        `SELECT purchase_unit_id, conversion_factor FROM raw_materials WHERE id = ?`,
+        [item.raw_material_id]
+      );
+
+      if (Number(item.unit_id) !== Number(rm.purchase_unit_id)) {
+        throw new Error("Purchase stock must be added in PURCHASE UNIT only");
+      }
+
+      const convertedQuantity = item.quantity * rm.conversion_factor;
+
+      await updateRawMaterialStockPurchase(
+        item.raw_material_id,
+        branch_id,
+        convertedQuantity,
+        conn
+      );
+
+      const amount = item.quantity * item.unit_price;
+      const itemDiscount = item.item_discount || 0;
+
+      let cgstAmount = 0, sgstAmount = 0, igstAmount = 0;
+      if (item.igst_percent && item.igst_percent > 0) {
+        igstAmount = amount * (item.igst_percent / 100);
+      } else {
+        cgstAmount = amount * ((item.cgst_percent || 0) / 100);
+        sgstAmount = amount * ((item.sgst_percent || 0) / 100);
+      }
+      const totalTax = cgstAmount + sgstAmount + igstAmount;
+      const finalAmount = amount + totalTax - itemDiscount;
+
+      await conn.query(
+        `INSERT INTO stock_purchase_items
+         (
+           purchase_order_id,
+           raw_material_id,
+           branch_id,
+           quantity,
+           unit_id,
+           unit_price,
+           amount,
+           cgst_percent,
+           sgst_percent,
+           igst_percent,
+           cgst_amount,
+           sgst_amount,
+           igst_amount,
+           item_discount,
+           final_amount
+         )
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          poId,
+          item.raw_material_id,
+          branch_id,
+          item.quantity,
+          item.unit_id,
+          item.unit_price,
+          amount,
+          item.cgst_percent || 0,
+          item.sgst_percent || 0,
+          item.igst_percent || 0,
+          cgstAmount,
+          sgstAmount,
+          igstAmount,
+          itemDiscount,
+          finalAmount
+        ]
+      );
+    }
+
+    await conn.commit();
+    res.json({ success: true, message: "Purchase stock edited successfully" });
+
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ success: false, message: err.message });
+  } finally {
+    conn.release();
+  }
+};
+
+/* ===== GET PAYMENTS ===== */
+export const getPaymentsController = async (req, res) => {
+  try {
+    const conn = await connectDB();
+    const { poId } = req.params;
+    const branch_id = req.user.branch_id;
+
+    const [payments] = await conn.query(
+      `SELECT id, payment_date, paid_amount, payment_mode, payment_ref_no, status, created_by, created_at
+       FROM purchase_order_payments
+       WHERE purchase_order_id = ? AND branch_id = ? AND status = 'Active'
+       ORDER BY id ASC`,
+      [poId, branch_id]
+    );
+
+    res.json({ success: true, data: payments });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* ===== ADD PAYMENT ===== */
+export const addPaymentController = async (req, res) => {
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const { poId } = req.params;
+    const { paid_amount, payment_date, payment_mode, payment_ref_no } = req.body;
+    const branch_id = req.user.branch_id;
+    const user_id = req.user.id;
+
+    // Fetch user name
+    const [[userRow]] = await conn.query(
+      `SELECT name FROM users WHERE id = ?`,
+      [user_id]
+    );
+    const creatorName = userRow?.name || "Ashish Mishra";
+
+    // Fetch PO details
+    const [[po]] = await conn.query(
+      `SELECT grand_total FROM purchase_orders WHERE id = ? AND branch_id = ?`,
+      [poId, branch_id]
+    );
+
+    if (!po) {
+      return res.status(404).json({ success: false, message: "Purchase order not found" });
+    }
+
+    // Insert payment
+    await conn.execute(
+      `INSERT INTO purchase_order_payments 
+       (purchase_order_id, branch_id, payment_date, paid_amount, payment_mode, payment_ref_no, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [poId, branch_id, payment_date || new Date(), paid_amount, payment_mode, payment_ref_no || null, creatorName]
+    );
+
+    // Calculate sum of active payments
+    const [[sumRow]] = await conn.query(
+      `SELECT COALESCE(SUM(paid_amount), 0) AS total_paid
+       FROM purchase_order_payments
+       WHERE purchase_order_id = ? AND branch_id = ? AND status = 'Active'`,
+      [poId, branch_id]
+    );
+
+    const totalPaid = Number(sumRow.total_paid);
+    const grandTotal = Number(po.grand_total);
+
+    let newStatus = "pending";
+    if (totalPaid >= grandTotal) {
+      newStatus = "paid";
+    } else if (totalPaid > 0) {
+      newStatus = "partial";
+    }
+
+    // Update PO payment status
+    await conn.execute(
+      `UPDATE purchase_orders SET payment_status = ? WHERE id = ?`,
+      [newStatus, poId]
+    );
+
+    await conn.commit();
+    res.json({ success: true, message: "Payment added successfully", totalPaid, remaining: grandTotal - totalPaid });
+
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ success: false, message: err.message });
+  } finally {
+    conn.release();
+  }
+};
+
+/* ===== DELETE PAYMENT ===== */
+export const deletePaymentController = async (req, res) => {
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const { paymentId } = req.params;
+    const branch_id = req.user.branch_id;
+
+    // Get payment details
+    const [[payment]] = await conn.query(
+      `SELECT purchase_order_id, paid_amount FROM purchase_order_payments WHERE id = ? AND branch_id = ?`,
+      [paymentId, branch_id]
+    );
+
+    if (!payment) {
+      return res.status(404).json({ success: false, message: "Payment record not found" });
+    }
+
+    const poId = payment.purchase_order_id;
+
+    // Delete payment record
+    await conn.execute(
+      `DELETE FROM purchase_order_payments WHERE id = ?`,
+      [paymentId]
+    );
+
+    // Fetch PO grand total
+    const [[po]] = await conn.query(
+      `SELECT grand_total FROM purchase_orders WHERE id = ? AND branch_id = ?`,
+      [poId, branch_id]
+    );
+
+    // Recalculate sum of active payments
+    const [[sumRow]] = await conn.query(
+      `SELECT COALESCE(SUM(paid_amount), 0) AS total_paid
+       FROM purchase_order_payments
+       WHERE purchase_order_id = ? AND branch_id = ? AND status = 'Active'`,
+      [poId, branch_id]
+    );
+
+    const totalPaid = Number(sumRow.total_paid);
+    const grandTotal = Number(po.grand_total);
+
+    let newStatus = "pending";
+    if (totalPaid >= grandTotal) {
+      newStatus = "paid";
+    } else if (totalPaid > 0) {
+      newStatus = "partial";
+    }
+
+    // Update PO payment status
+    await conn.execute(
+      `UPDATE purchase_orders SET payment_status = ? WHERE id = ?`,
+      [newStatus, poId]
+    );
+
+    await conn.commit();
+    res.json({ success: true, message: "Payment deleted successfully", totalPaid, remaining: grandTotal - totalPaid });
+
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ success: false, message: err.message });
+  } finally {
+    conn.release();
+  }
+};
