@@ -9,6 +9,13 @@ export const createPurchaseOrderController = async (req, res) => {
   try {
     const conn = await connectDB();
     const branch_id = req.user.branch_id;
+    const user_id = req.user.id;
+
+    const [[userRow]] = await conn.query(
+      `SELECT name FROM users WHERE id = ?`,
+      [user_id]
+    );
+    const creatorName = userRow?.name || "Ashish Mishra";
 
     const {
       supplier_id,
@@ -84,7 +91,8 @@ export const createPurchaseOrderController = async (req, res) => {
       tax_amount,
       discount_amount,
       grandTotal,
-      payment_status
+      payment_status,
+      creatorName
     ];
 
     const purchaseOrderId =
