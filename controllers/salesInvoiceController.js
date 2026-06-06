@@ -4,33 +4,103 @@ export const createSalesInvoiceController = async (req, res) => {
   const pool = await connectDB();
   const conn = await pool.getConnection();
 
+  const generateInvoiceNumber = async () => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const candidate = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const [rows] = await conn.execute(
+        `SELECT id FROM invoices WHERE invoice_number = ? LIMIT 1`,
+        [candidate]
+      );
+      if (!rows.length) return candidate;
+    }
+    throw new Error("Unable to generate unique invoice number");
+  };
+
+  const generateTokenNumber = async () => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const candidate = `TKN-${Math.floor(1000 + Math.random() * 9000)}`;
+      const [rows] = await conn.execute(
+        `SELECT id FROM invoices WHERE token_number = ? LIMIT 1`,
+        [candidate]
+      );
+      if (!rows.length) return candidate;
+    }
+    throw new Error("Unable to generate unique token number");
+  };
+
   try {
     await conn.beginTransaction();
 
-    const branch_id = req.user.branch_id;
-    const { id, client_name, subtotal, gst, total, items } = req.body;
+    const branch_id = req.user?.branch_id || null;
+    const {
+      invoice_number,
+      token_number,
+      kot_number,
+      total_amount,
+      items,
+      total
+    } = req.body;
 
-    if (!id || !items || !items.length) {
+    const invoiceNumber = invoice_number || await generateInvoiceNumber();
+    const tokenNumber = token_number || await generateTokenNumber();
+    const invoiceTotal = total_amount ?? total;
+    const kotNumber = kot_number || tokenNumber || invoiceNumber || "NA";
+
+    if (!invoiceNumber || !tokenNumber || !items || !items.length) {
       return res.status(400).json({
         success: false,
-        message: "Invoice ID and items are required"
+        message: "invoice_number, token_number and items are required"
       });
     }
 
-    // 1. Insert Sales Invoice
-    await conn.execute(
-      `INSERT INTO sales_invoices (id, branch_id, client_name, subtotal, gst, total)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, branch_id, client_name || null, subtotal, gst, total]
+    const [existingRows] = await conn.execute(
+      `SELECT id, invoice_number, token_number FROM invoices WHERE invoice_number = ? OR token_number = ? LIMIT 1`,
+      [invoiceNumber, tokenNumber]
     );
 
-    // 2. Insert Invoice Items and Perform Auto-Consumption
+    if (existingRows.length > 0) {
+      const existingInvoice = existingRows[0];
+      const duplicateMessage = existingInvoice.invoice_number === invoiceNumber
+        ? "Invoice number already exists"
+        : "Token number already exists";
+
+      return res.status(409).json({
+        success: false,
+        message: duplicateMessage
+      });
+    }
+
+    const [invoiceResult] = await conn.execute(
+      `INSERT INTO invoices (invoice_number, token_number, kot_number, total_amount)
+       VALUES (?, ?, ?, ?)`,
+      [invoiceNumber, tokenNumber, kotNumber, invoiceTotal ?? 0]
+    );
+
+    const invoiceId = invoiceResult.insertId;
+
     for (const item of items) {
-      // Insert item
+      const itemQty = Number(item.qty ?? item.quantity ?? 0);
+      const itemPrice = Number(item.price ?? 0);
+      const itemSubtotal = Number((itemQty * itemPrice).toFixed(2));
+      let itemId = item.item_id || item.id || null;
+
+      if (!itemId) {
+        const [itemRows] = await conn.execute(
+          `SELECT id FROM items WHERE name = ? AND is_active = 1 ${branch_id ? "AND branch_id = ?" : ""} LIMIT 1`,
+          branch_id ? [item.name, branch_id] : [item.name]
+        );
+
+        if (!itemRows.length) {
+          throw new Error(`Item not found: ${item.name}`);
+        }
+
+        itemId = itemRows[0].id;
+      }
+
       await conn.execute(
-        `INSERT INTO sales_invoice_items (invoice_id, item_name, quantity, price)
-         VALUES (?, ?, ?, ?)`,
-         [id, item.name, item.qty, item.price]
+        `INSERT INTO invoice_items (invoice_id, item_id, quantity, price, subtotal)
+         VALUES (?, ?, ?, ?, ?)`,
+        [invoiceId, itemId, itemQty, itemPrice, itemSubtotal]
       );
 
       // 2.1 Deduct from Received vouchers of this item (FIFO)
@@ -63,52 +133,49 @@ export const createSalesInvoiceController = async (req, res) => {
 
       // Check if finished item exists and get its ID
       const [[dbItem]] = await conn.execute(
-        `SELECT id FROM items WHERE name = ? AND branch_id = ? AND is_active = 1`,
-        [item.name, branch_id]
+        `SELECT id FROM items WHERE id = ? AND is_active = 1 ${branch_id ? "AND branch_id = ?" : ""}`,
+        branch_id ? [itemId, branch_id] : [itemId]
       );
 
       if (dbItem) {
-        // Find active recipe for this item
-        const [[recipe]] = await conn.execute(
-          `SELECT id, item_quantity FROM recipes WHERE item_id = ? AND branch_id = ? AND is_active = 1`,
-          [dbItem.id, branch_id]
-        );
+        const recipeQuery = `SELECT id, item_quantity FROM recipes WHERE item_id = ? AND is_active = 1 ${branch_id ? "AND branch_id = ?" : ""}`;
+        const recipeParams = branch_id ? [dbItem.id, branch_id] : [dbItem.id];
+        const [[recipe]] = await conn.execute(recipeQuery, recipeParams);
 
         if (recipe) {
-          // Get recipe ingredients
           const [materials] = await conn.execute(
             `SELECT raw_material_id, quantity FROM recipe_materials WHERE recipe_id = ?`,
             [recipe.id]
           );
 
-          // Calculate factor: how many recipe portions did we sell?
-          // e.g., if recipe produces 1 Samosa (item_quantity = 1), and we sold 10, factor is 10/1 = 10.
-          const portionFactor = Number(item.qty) / Number(recipe.item_quantity || 1);
+          const portionFactor = Number(itemQty) / Number(recipe.item_quantity || 1);
 
           for (const mat of materials) {
             const consumedQty = Number(mat.quantity) * portionFactor;
-
-            // Check if stock entry exists
-            const [[stock]] = await conn.execute(
-              `SELECT id FROM raw_material_stock WHERE raw_material_id = ? AND branch_id = ?`,
-              [mat.raw_material_id, branch_id]
-            );
+            const stockQuery = `SELECT id FROM raw_material_stock WHERE raw_material_id = ? ${branch_id ? "AND branch_id = ?" : ""}`;
+            const stockParams = branch_id ? [mat.raw_material_id, branch_id] : [mat.raw_material_id];
+            const [[stock]] = await conn.execute(stockQuery, stockParams);
 
             if (stock) {
-              // Deduct stock (it can go negative)
-              await conn.execute(
-                `UPDATE raw_material_stock
+              const updateQuery = `UPDATE raw_material_stock
                  SET quantity = quantity - ?, last_updated_at = NOW()
-                 WHERE raw_material_id = ? AND branch_id = ?`,
-                [consumedQty, mat.raw_material_id, branch_id]
-              );
+                 WHERE raw_material_id = ? ${branch_id ? "AND branch_id = ?" : ""}`;
+              const updateParams = branch_id ? [consumedQty, mat.raw_material_id, branch_id] : [consumedQty, mat.raw_material_id];
+              await conn.execute(updateQuery, updateParams);
             } else {
-              // Create stock entry with negative quantity
-              await conn.execute(
-                `INSERT INTO raw_material_stock (raw_material_id, branch_id, quantity, last_updated_at)
-                 VALUES (?, ?, ?, NOW())`,
-                [mat.raw_material_id, branch_id, -consumedQty]
-              );
+              if (branch_id) {
+                await conn.execute(
+                  `INSERT INTO raw_material_stock (raw_material_id, branch_id, quantity, last_updated_at)
+                   VALUES (?, ?, ?, NOW())`,
+                  [mat.raw_material_id, branch_id, -consumedQty]
+                );
+              } else {
+                await conn.execute(
+                  `INSERT INTO raw_material_stock (raw_material_id, quantity, last_updated_at)
+                   VALUES (?, ?, NOW())`,
+                  [mat.raw_material_id, -consumedQty]
+                );
+              }
             }
           }
         }
@@ -119,7 +186,15 @@ export const createSalesInvoiceController = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "POS Invoice created and raw material stock consumed successfully"
+      message: "Invoice created and raw material stock consumed successfully",
+      data: {
+        invoice_id: invoiceId,
+        invoice_number: invoiceNumber,
+        token_number: tokenNumber,
+        kot_number: kotNumber,
+        total_amount: invoiceTotal ?? 0,
+        client_name: req.body.client_name || null
+      }
     });
 
   } catch (error) {
@@ -138,14 +213,14 @@ export const createSalesInvoiceController = async (req, res) => {
 export const getSalesInvoicesController = async (req, res) => {
   try {
     const pool = await connectDB();
-    const branch_id = req.user.branch_id;
 
     const [rows] = await pool.execute(
-      `SELECT id, client_name AS client, DATE_FORMAT(created_at, '%d-%m-%Y') AS date, total AS amount, status
-       FROM sales_invoices
-       WHERE branch_id = ?
-       ORDER BY created_at DESC`,
-      [branch_id]
+      `SELECT id, invoice_number, token_number, kot_number, client_name,
+              total_amount AS amount,
+              DATE_FORMAT(created_at, '%d-%m-%Y') AS date,
+              COALESCE(status, 'Paid') AS status
+       FROM invoices
+       ORDER BY created_at DESC`
     );
 
     res.status(200).json({
@@ -165,50 +240,20 @@ export const getSalesInvoicesController = async (req, res) => {
 export const getSalesDashboardStatsController = async (req, res) => {
   try {
     const pool = await connectDB();
-    const branch_id = req.user.branch_id;
 
-    // 1. Total Revenue
     const [[{ total_revenue }]] = await pool.execute(
-      `SELECT COALESCE(SUM(total), 0) AS total_revenue 
-       FROM sales_invoices 
-       WHERE branch_id = ? AND status = 'Paid'`,
-      [branch_id]
+      `SELECT COALESCE(SUM(total_amount), 0) AS total_revenue FROM invoices`
     );
 
-    // 2. Total Invoices Count
     const [[{ total_invoices }]] = await pool.execute(
-      `SELECT COUNT(*) AS total_invoices 
-       FROM sales_invoices 
-       WHERE branch_id = ?`,
-      [branch_id]
+      `SELECT COUNT(*) AS total_invoices FROM invoices`
     );
 
-    // 3. Pending Payments
-    const [[{ pending_payments }]] = await pool.execute(
-      `SELECT COALESCE(SUM(total), 0) AS pending_payments 
-       FROM sales_invoices 
-       WHERE branch_id = ? AND (status = 'Pending' OR status = 'Unpaid')`,
-      [branch_id]
-    );
-
-    // 4. Paid This Month
-    const [[{ paid_this_month }]] = await pool.execute(
-      `SELECT COALESCE(SUM(total), 0) AS paid_this_month 
-       FROM sales_invoices 
-       WHERE branch_id = ? AND status = 'Paid' 
-         AND MONTH(created_at) = MONTH(CURRENT_DATE()) 
-         AND YEAR(created_at) = YEAR(CURRENT_DATE())`,
-      [branch_id]
-    );
-
-    // 5. Recent Invoices (Latest 5)
     const [recent_invoices] = await pool.execute(
-      `SELECT id, client_name AS client, total AS amount, status 
-       FROM sales_invoices
-       WHERE branch_id = ?
+      `SELECT invoice_number, token_number, kot_number, total_amount AS amount
+       FROM invoices
        ORDER BY created_at DESC
-       LIMIT 5`,
-      [branch_id]
+       LIMIT 5`
     );
 
     res.status(200).json({
@@ -216,8 +261,6 @@ export const getSalesDashboardStatsController = async (req, res) => {
       data: {
         total_revenue: Number(total_revenue),
         total_invoices: Number(total_invoices),
-        pending_payments: Number(pending_payments),
-        paid_this_month: Number(paid_this_month),
         recent_invoices
       }
     });

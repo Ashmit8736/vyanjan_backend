@@ -45,13 +45,14 @@ export const getItemsByBranch = async (branch_id) => {
         i.name,
         i.category,
         i.selling_price,
-        i.created_at,
+        i.short_code,
+        i.stock_status,
         i.item_unit_id,
         i.short_code,
         i.stock_status,
         i.favorite,
 
-        r.id            AS recipe_id,        -- ✅ REQUIRED
+        r.id            AS recipe_id,
         r.item_quantity,
         r.item_unit_id  AS recipe_unit_id,   -- ✅ REQUIRED
 
@@ -76,7 +77,7 @@ export const getItemsByBranch = async (branch_id) => {
      WHERE i.branch_id = ?
        AND i.is_active = 1
 
-     ORDER BY i.id DESC`,
+     ORDER BY i.favorite DESC, i.id DESC`,
     [branch_id]
   );
 
@@ -116,7 +117,7 @@ export const updateItem = async (
     ]
   );
 
-  return result;
+  return result.affectedRows;
 };
 
 /**

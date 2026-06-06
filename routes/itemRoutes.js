@@ -17,6 +17,13 @@ router.post(
   createItemController
 );
 
+// update item
+router.put(
+  "/update/:id",
+  userAuth,
+  updateItemController
+);
+
 // get all items (branch-wise)
 router.get(
   "/list",
