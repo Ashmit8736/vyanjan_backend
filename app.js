@@ -15,6 +15,7 @@ import recipeRoutes from "./routes/recipeRoutes.js";
 import productionRoutes from "./routes/producationRoute.js"
 import salesInvoiceRoutes from "./routes/salesInvoiceRoutes.js";
 import wastageRoutes from "./routes/wastageRoutes.js";
+import voucherRoutes from "./routes/voucherRoutes.js";
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use("/api/recipe", recipeRoutes);
 app.use("/api/production", productionRoutes);
 app.use("/api/invoices", salesInvoiceRoutes);
 app.use("/api/wastage", wastageRoutes);
+app.use("/api/vouchers", voucherRoutes);
 
 
 export default app;

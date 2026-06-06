@@ -101,6 +101,27 @@ export const createProduction = async ({
 
         const production_id = prodResult.insertId;
 
+        /* 5.1️⃣ Get item name and insert pending voucher with random 6-digit ID */
+        const [[itemRow]] = await conn.execute(
+            `SELECT name FROM items WHERE id = ?`,
+            [item_id]
+        );
+        const itemName = itemRow ? itemRow.name : "Unknown Item";
+
+        let isUnique = false;
+        let randomVoucherId;
+        while (!isUnique) {
+          randomVoucherId = Math.floor(100000 + Math.random() * 900000);
+          const [[row]] = await conn.execute("SELECT id FROM vouchers WHERE id = ?", [randomVoucherId]);
+          if (!row) isUnique = true;
+        }
+
+        await conn.execute(
+            `INSERT INTO vouchers (id, branch_id, item_id, item_name, quantity, remaining_quantity, status)
+             VALUES (?, ?, ?, ?, ?, ?, 'Pending')`,
+            [randomVoucherId, branch_id, item_id, itemName, produce_quantity, produce_quantity]
+        );
+
         /* 6️⃣ Deduct stock + insert production_materials */
         for (const m of materials) {
             const requiredQty = m.quantity * recipeCount;
