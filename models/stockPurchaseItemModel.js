@@ -146,25 +146,21 @@ export const getStockPurchaseList = async (branchId) => {
     SELECT
       po.id,
       po.po_number,
+      po.invoice_number,
       po.purchase_date AS invoice_date,
       s.name AS supplier_name,
-
-      -- 🔥 GRAND TOTAL
-      SUM(
-        (spi.quantity * spi.unit_price)
-        + ((spi.cgst_percent + spi.sgst_percent + spi.igst_percent) / 100)
-          * (spi.quantity * spi.unit_price)
-        - spi.item_discount
-      ) AS grand_total
-
+      po.grand_total,
+      po.tax_amount,
+      po.payment_status,
+      po.status,
+      po.created_by,
+      (SELECT COALESCE(SUM(paid_amount), 0) 
+       FROM purchase_order_payments 
+       WHERE purchase_order_id = po.id AND status = 'Active') AS total_paid
     FROM purchase_orders po
-    JOIN suppliers s
-      ON s.id = po.supplier_id
-    JOIN stock_purchase_items spi
-      ON spi.purchase_order_id = po.id
-
-    WHERE spi.branch_id = ?
-    GROUP BY po.id
+    JOIN suppliers s ON s.id = po.supplier_id
+    WHERE po.branch_id = ?
+      AND po.status IN ('completed', 'cancelled')
     ORDER BY po.id DESC
     `,
     [branchId]
@@ -203,8 +199,10 @@ export const getStockReportByPONumber = async (poNumber, branchId) => {
   const [items] = await conn.query(
     `
     SELECT
+      spi.raw_material_id,
       rm.name AS rawMaterial,
       spi.quantity AS qty,
+      spi.unit_id,
       u.unit_symbol AS unit,
       spi.unit_price AS price,
       spi.cgst_percent AS cgst,

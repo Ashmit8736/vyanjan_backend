@@ -103,6 +103,35 @@ export const createSalesInvoiceController = async (req, res) => {
         [invoiceId, itemId, itemQty, itemPrice, itemSubtotal]
       );
 
+      // 2.1 Deduct from Received vouchers of this item (FIFO)
+      let quantityToDeduct = Number(item.qty);
+      const [vouchersList] = await conn.execute(
+        `SELECT id, remaining_quantity FROM vouchers
+         WHERE branch_id = ? AND item_name = ? AND status = 'Received' AND remaining_quantity > 0
+         ORDER BY received_at ASC, id ASC`,
+        [branch_id, item.name]
+      );
+
+      for (const voucher of vouchersList) {
+        if (quantityToDeduct <= 0) break;
+
+        const remQty = Number(voucher.remaining_quantity);
+        if (remQty >= quantityToDeduct) {
+          await conn.execute(
+            `UPDATE vouchers SET remaining_quantity = remaining_quantity - ? WHERE id = ?`,
+            [quantityToDeduct, voucher.id]
+          );
+          quantityToDeduct = 0;
+        } else {
+          await conn.execute(
+            `UPDATE vouchers SET remaining_quantity = 0 WHERE id = ?`,
+            [voucher.id]
+          );
+          quantityToDeduct -= remQty;
+        }
+      }
+
+      // Check if finished item exists and get its ID
       const [[dbItem]] = await conn.execute(
         `SELECT id FROM items WHERE id = ? AND is_active = 1 ${branch_id ? "AND branch_id = ?" : ""}`,
         branch_id ? [itemId, branch_id] : [itemId]
