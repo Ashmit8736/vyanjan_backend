@@ -215,7 +215,7 @@ export const getSalesInvoicesController = async (req, res) => {
     const pool = await connectDB();
 
     const [rows] = await pool.execute(
-      `SELECT id, invoice_number, token_number, kot_number, client_name,
+      `SELECT id, invoice_number, token_number, kot_number, '' As client_name,
               total_amount AS amount,
               DATE_FORMAT(created_at, '%d-%m-%Y') AS date,
               COALESCE(status, 'Paid') AS status
