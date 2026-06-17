@@ -30,6 +30,37 @@ const UnitModel = {
     ]);
 
     return result;
+  },
+
+  update: async (id, data) => {
+    const db = await connectDB();
+
+    const sql = `
+      UPDATE units
+      SET unit_name = ?, unit_symbol = ?
+      WHERE id = ?
+    `;
+
+    const [result] = await db.execute(sql, [
+      data.unit_name,
+      data.unit_symbol,
+      id
+    ]);
+
+    return result;
+  },
+
+  delete: async (id) => {
+    const db = await connectDB();
+
+    const sql = `
+      UPDATE units
+      SET is_active = 0
+      WHERE id = ?
+    `;
+
+    const [result] = await db.execute(sql, [id]);
+    return result;
   }
 };
 

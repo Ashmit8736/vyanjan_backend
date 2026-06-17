@@ -68,3 +68,24 @@ export const deleteSupplier = async (id, branchId) => {
 
   return true;
 };
+
+/**
+ * UPDATE SUPPLIER (BRANCH SAFE)
+ */
+export const updateSupplier = async (id, branchId, data) => {
+  const db = await connectDB();
+
+  await db.query(
+    `UPDATE suppliers
+     SET name = ?, company_name = ?, email = ?, phone = ?,
+         billing_address = ?, billing_state = ?, billing_city = ?, billing_pincode = ?,
+         shipping_address = ?, shipping_state = ?, shipping_city = ?, shipping_pincode = ?,
+         gst_number = ?, pan = ?, fssai_license = ?, msme_number = ?, tan = ?, cin = ?,
+         tcs_applicable = ?, tcs_type = ?, tcs_percentage = ?
+     WHERE id = ? AND branch_id = ?`,
+    [...data, id, branchId]
+  );
+
+  return true;
+};
+
