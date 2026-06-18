@@ -11,13 +11,22 @@ export const createItem = async (
   item_unit_id,
   short_code = null,
   stock_status = "In Stock",
-  favorite = 0
+  favorite = 0,
+  original_qty = 0,
+  remaining_qty = 0
 ) => {
   const conn = await connectDB();
 
+  let final_stock_status = stock_status;
+  if (remaining_qty > 0 && stock_status === "Out of Stock") {
+    final_stock_status = "In Stock";
+  } else if (remaining_qty <= 0 && stock_status !== "Do Not Track") {
+    final_stock_status = "Out of Stock";
+  }
+
   const [result] = await conn.execute(
-    `INSERT INTO items (branch_id, name, category, selling_price, item_unit_id, short_code, stock_status, favorite)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO items (branch_id, name, category, selling_price, item_unit_id, short_code, stock_status, favorite, original_qty, remaining_qty)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       branch_id,
       name,
@@ -25,8 +34,10 @@ export const createItem = async (
       selling_price || 0,
       item_unit_id || null,
       short_code || null, 
-      stock_status || "In Stock",
-      favorite ? 1 : 0
+      final_stock_status || "In Stock",
+      favorite ? 1 : 0,
+      original_qty,
+      remaining_qty
     ]
   );
 
@@ -48,9 +59,9 @@ export const getItemsByBranch = async (branch_id) => {
         i.short_code,
         i.stock_status,
         i.item_unit_id,
-        i.short_code,
-        i.stock_status,
         i.favorite,
+        i.original_qty,
+        i.remaining_qty,
 
         r.id            AS recipe_id,
         r.item_quantity,
@@ -96,13 +107,38 @@ export const updateItem = async (
   item_unit_id,
   short_code = null,
   stock_status = "In Stock",
-  favorite = 0
+  favorite = 0,
+  original_qty = 0,
+  remaining_qty = 0
 ) => {
   const conn = await connectDB();
 
+  // 1. Fetch old item details
+  const [[oldItem]] = await conn.execute(
+    `SELECT original_qty, remaining_qty, stock_status FROM items WHERE id = ? AND branch_id = ?`,
+    [id, branch_id]
+  );
+
+  let final_remaining_qty = Number(remaining_qty);
+  if (oldItem) {
+    // If the request's remaining_qty matches the old remaining_qty, but original_qty has increased,
+    // we assume they are restocking by changing the original_qty, so we add the difference to remaining_qty.
+    if (Number(remaining_qty) === Number(oldItem.remaining_qty) && Number(original_qty) > Number(oldItem.original_qty)) {
+      const diff = Number(original_qty) - Number(oldItem.original_qty);
+      final_remaining_qty = Number(oldItem.remaining_qty) + diff;
+    }
+  }
+
+  let final_stock_status = stock_status;
+  if (final_remaining_qty > 0) {
+    final_stock_status = "In Stock";
+  } else if (final_remaining_qty <= 0 && stock_status !== "Do Not Track") {
+    final_stock_status = "Out of Stock";
+  }
+
   const [result] = await conn.execute(
     `UPDATE items 
-     SET name = ?, category = ?, selling_price = ?, item_unit_id = ?, short_code = ?, stock_status = ?, favorite = ?
+     SET name = ?, category = ?, selling_price = ?, item_unit_id = ?, short_code = ?, stock_status = ?, favorite = ?, original_qty = ?, remaining_qty = ?
      WHERE id = ? AND branch_id = ?`,
     [
       name,
@@ -110,8 +146,10 @@ export const updateItem = async (
       selling_price || 0,
       item_unit_id || null,
       short_code || null,
-      stock_status || "In Stock",
+      final_stock_status || "In Stock",
       favorite ? 1 : 0,
+      original_qty,
+      final_remaining_qty,
       id,
       branch_id
     ]

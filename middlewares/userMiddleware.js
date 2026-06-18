@@ -16,6 +16,10 @@ const userAuth = (req, res, next) => {
       branch_id: decoded.branch_id || null
     };
 
+    const headerBranchId = req.headers["x-branch-id"];
+    if (headerBranchId) {
+      req.user.branch_id = parseInt(headerBranchId, 10);
+    }
 
     next();
   } catch (err) {

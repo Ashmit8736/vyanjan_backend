@@ -233,7 +233,7 @@ import { createItem, getItemsByBranch, updateItem, deleteItem, getItemLogs, chec
  */
 export const createItemController = async (req, res) => {
   try {
-    const { name, category, selling_price, item_unit_id, short_code, stock_status, favorite } = req.body;
+    const { name, category, selling_price, item_unit_id, short_code, stock_status, favorite, original_qty } = req.body;
     const branch_id = req.user.branch_id;
 
     if (!name) {
@@ -259,7 +259,9 @@ export const createItemController = async (req, res) => {
       item_unit_id || null,
       short_code || null,
       stock_status || "In Stock",
-      favorite ? Number(favorite) : 0
+      favorite ? Number(favorite) : 0,
+      Number(original_qty || 0),
+      Number(original_qty || 0)
     );
 
     res.status(201).json({
@@ -303,7 +305,7 @@ export const getItemsController = async (req, res) => {
 export const updateItemController = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, selling_price, item_unit_id, short_code, stock_status, favorite } = req.body;
+    const { name, category, selling_price, item_unit_id, short_code, stock_status, favorite, original_qty, remaining_qty } = req.body;
     const branch_id = req.user.branch_id;
 
     if (!name) {
@@ -330,7 +332,9 @@ export const updateItemController = async (req, res) => {
       item_unit_id ? Number(item_unit_id) : null,
       short_code || null,
       stock_status || "In Stock",
-      favorite ? Number(favorite) : 0
+      favorite ? Number(favorite) : 0,
+      original_qty !== undefined ? Number(original_qty) : 0,
+      remaining_qty !== undefined ? Number(remaining_qty) : 0
     );
 
     if (!affectedRows) {
