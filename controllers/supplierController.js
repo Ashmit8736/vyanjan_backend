@@ -2,7 +2,8 @@ import {
   createSupplier,
   getSuppliersByBranch,
   getSupplierById,
-  deleteSupplier
+  deleteSupplier,
+  updateSupplier
 } from "../models/supplierModel.js";
 
 /**
@@ -140,3 +141,65 @@ export const deleteSupplierController = async (req, res) => {
     });
   }
 };
+
+/**
+ * UPDATE SUPPLIER
+ */
+export const updateSupplierController = async (req, res) => {
+  try {
+    const { name, company_name, phone, billing_address } = req.body;
+
+    // 🔴 Mandatory fields
+    if (!name || !company_name || !phone || !billing_address) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, Company Name, Phone and Address are mandatory"
+      });
+    }
+
+    const branchId = req.user.branch_id;
+    const supplierId = req.params.id;
+
+    const data = [
+      name,
+      company_name,
+      req.body.email || null,
+      phone,
+
+      billing_address,
+      req.body.billing_state || null,
+      req.body.billing_city || null,
+      req.body.billing_pincode || null,
+
+      req.body.shipping_address || null,
+      req.body.shipping_state || null,
+      req.body.shipping_city || null,
+      req.body.shipping_pincode || null,
+
+      req.body.gst_number || null,
+      req.body.pan || null,
+      req.body.fssai_license || null,
+      req.body.msme_number || null,
+      req.body.tan || null,
+      req.body.cin || null,
+
+      req.body.tcs_applicable || 0,
+      req.body.tcs_type || null,
+      req.body.tcs_percentage || 0
+    ];
+
+    await updateSupplier(supplierId, branchId, data);
+
+    res.json({
+      success: true,
+      message: "Supplier updated successfully"
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+

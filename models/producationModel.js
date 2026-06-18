@@ -45,7 +45,19 @@ export const createProduction = async ({
 
         /* 4️⃣ Stock check */
         for (const m of materials) {
-            const requiredQty = m.quantity * recipeCount;
+            let requiredQty = m.quantity * recipeCount;
+
+            const [[rmDetails]] = await conn.execute(
+                `SELECT purchase_unit_id, consume_unit_id, conversion_factor FROM raw_materials WHERE id = ?`,
+                [m.raw_material_id]
+            );
+
+            if (rmDetails && Number(m.consume_unit_id) === Number(rmDetails.purchase_unit_id)) {
+                requiredQty = requiredQty * Number(rmDetails.conversion_factor || 1);
+            }
+            
+            // attach converted quantity to m for deduction step
+            m.convertedRequiredQty = requiredQty;
 
             const [[stock]] = await conn.execute(
                 `
@@ -59,12 +71,11 @@ export const createProduction = async ({
     ON rms.raw_material_id = rm.id
    AND rms.branch_id = ?
   LEFT JOIN units u
-    ON u.id = ?
+    ON u.id = rm.consume_unit_id
   WHERE rm.id = ?
   `,
                 [
                     branch_id,
-                    m.consume_unit_id,   // unit from recipe_materials
                     m.raw_material_id
                 ]
             );
@@ -124,7 +135,7 @@ export const createProduction = async ({
 
         /* 6️⃣ Deduct stock + insert production_materials */
         for (const m of materials) {
-            const requiredQty = m.quantity * recipeCount;
+            const requiredQty = m.convertedRequiredQty;
 
             await conn.execute(
                 `UPDATE raw_material_stock
@@ -141,7 +152,7 @@ export const createProduction = async ({
                     production_id,
                     recipe_id,
                     m.raw_material_id,
-                    requiredQty,
+                    m.quantity * recipeCount,
                     m.consume_unit_id
                 ]
             );

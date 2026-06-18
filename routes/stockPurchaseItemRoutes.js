@@ -9,7 +9,8 @@ import {
   editStockPurchaseItemsController,
   getPaymentsController,
   addPaymentController,
-  deletePaymentController
+  deletePaymentController,
+  createDirectStockPurchaseController
 } from "../controllers/stockPurchaseItemController.js";
 import userAuth from "../middlewares/userMiddleware.js";
 
@@ -17,6 +18,7 @@ import userAuth from "../middlewares/userMiddleware.js";
 const router = express.Router();
 
 router.post("/stock-purchase-items", userAuth, createStockPurchaseItemsController);
+router.post("/direct-purchase", userAuth, createDirectStockPurchaseController);
 
 router.get("/stock", userAuth, getStockController);
 router.get("/stock-report/:poNumber", userAuth, getStockReport);
