@@ -88,9 +88,9 @@ export const checkRawMaterialStock = async (materials, branch_id) => {
 
   for (const m of materials) {
 
-    // 🔹 STEP 1: Raw material ka NAME (hamesha)
+    // 🔹 STEP 1: Raw material ka NAME and Units
     const [rawRows] = await conn.execute(
-      `SELECT name 
+      `SELECT name, purchase_unit_id, consume_unit_id, conversion_factor 
        FROM raw_materials 
        WHERE id = ?`,
       [m.raw_material_id]
@@ -99,6 +99,8 @@ export const checkRawMaterialStock = async (materials, branch_id) => {
     const rawName = rawRows.length
       ? rawRows[0].name
       : "Raw Material";
+
+    const rmDetails = rawRows.length ? rawRows[0] : null;
 
     // 🔹 STEP 2: Stock check (branch-wise)
     const [stockRows] = await conn.execute(
@@ -117,8 +119,12 @@ export const checkRawMaterialStock = async (materials, branch_id) => {
       };
     }
 
+    let requiredQty = Number(m.quantity);
+    if (rmDetails && Number(m.consume_unit_id) === Number(rmDetails.purchase_unit_id)) {
+        requiredQty = requiredQty * Number(rmDetails.conversion_factor || 1);
+    }
+
     const availableQty = Number(stockRows[0].quantity);
-    const requiredQty = Number(m.quantity);
 
     // ❌ Insufficient stock
     if (availableQty < requiredQty) {

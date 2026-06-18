@@ -626,3 +626,218 @@ export const deletePaymentController = async (req, res) => {
     conn.release();
   }
 };
+
+/* ===== CREATE DIRECT STOCK PURCHASE (NO PO REQUIRED) ===== */
+export const createDirectStockPurchaseController = async (req, res) => {
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const branch_id = req.user.branch_id;
+    const user_id = req.user.id;
+    const { 
+      supplier_id, 
+      supplier_name, 
+      invoice_number, 
+      invoice_date, 
+      payment_status, 
+      items 
+    } = req.body;
+
+    if (!items || items.length === 0) {
+      throw new Error("Purchase items are required");
+    }
+
+    // Fetch user name
+    const [[userRow]] = await conn.query(
+      `SELECT name FROM users WHERE id = ?`,
+      [user_id]
+    );
+    const creatorName = userRow?.name || "Ashish Mishra";
+
+    // 1. Handle Supplier (Manual entry support)
+    let finalSupplierId = supplier_id;
+
+    if (!finalSupplierId) {
+      if (!supplier_name) {
+        throw new Error("Either supplier_id or supplier_name must be provided");
+      }
+      
+      // Check if a supplier with this name already exists in this branch
+      const [[existingSupplier]] = await conn.query(
+        `SELECT id FROM suppliers WHERE name = ? AND branch_id = ?`,
+        [supplier_name, branch_id]
+      );
+
+      if (existingSupplier) {
+        finalSupplierId = existingSupplier.id;
+      } else {
+        // Create new supplier on the fly
+        const [supplierResult] = await conn.query(
+          `INSERT INTO suppliers (branch_id, name, phone, is_active) VALUES (?, ?, ?, 1)`,
+          [branch_id, supplier_name, "N/A"]
+        );
+        finalSupplierId = supplierResult.insertId;
+      }
+    }
+
+    // 2. Generate unique PO number (e.g., DIR-YYYYMMDD-HHMMSS)
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[-:T]/g, "").slice(0, 14); 
+    const poNumber = `DIR-${timestamp}`;
+
+    // 3. Calculate Totals
+    let subTotal = 0;
+    let taxAmount = 0;
+    let discountAmount = 0;
+
+    for (const item of items) {
+      const amount = item.quantity * item.unit_price;
+      subTotal += amount;
+
+      let cgstAmount = 0, sgstAmount = 0, igstAmount = 0;
+      if (item.igst_percent && item.igst_percent > 0) {
+        igstAmount = amount * (item.igst_percent / 100);
+      } else {
+        cgstAmount = amount * ((item.cgst_percent || 0) / 100);
+        sgstAmount = amount * ((item.sgst_percent || 0) / 100);
+      }
+      taxAmount += (cgstAmount + sgstAmount + igstAmount);
+      discountAmount += Number(item.item_discount || 0);
+    }
+
+    const grandTotal = subTotal + taxAmount - discountAmount;
+
+    // 4. Create Purchase Order
+    const [poResult] = await conn.query(
+      `INSERT INTO purchase_orders
+       (branch_id, supplier_id, po_number, invoice_number,
+        purchase_date, sub_total, tax_amount, discount_amount, grand_total, payment_status, status, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        branch_id,
+        finalSupplierId,
+        poNumber,
+        invoice_number || null,
+        invoice_date || new Date(),
+        subTotal,
+        taxAmount,
+        discountAmount,
+        grandTotal,
+        payment_status || "pending",
+        "completed", // Auto complete since stock is received
+        creatorName
+      ]
+    );
+
+    const purchaseOrderId = poResult.insertId;
+
+    // 5. Add Items and Update Stock
+    for (const item of items) {
+      const [[rm]] = await conn.query(
+        `SELECT purchase_unit_id, conversion_factor FROM raw_materials WHERE id = ?`,
+        [item.raw_material_id]
+      );
+
+      if (!rm) {
+        throw new Error(`Raw material not found for ID: ${item.raw_material_id}`);
+      }
+
+      if (Number(item.unit_id) !== Number(rm.purchase_unit_id)) {
+        throw new Error("Purchase stock must be added in PURCHASE UNIT only");
+      }
+
+      // Convert and update stock
+      const convertedQuantity = item.quantity * rm.conversion_factor;
+      
+      const [[stock]] = await conn.query(
+        `SELECT id FROM raw_material_stock
+         WHERE raw_material_id = ? AND branch_id = ?`,
+        [item.raw_material_id, branch_id]
+      );
+    
+      if (stock) {
+        await conn.query(
+          `UPDATE raw_material_stock
+           SET quantity = quantity + ?, last_updated_at = NOW()
+           WHERE raw_material_id = ? AND branch_id = ?`,
+          [convertedQuantity, item.raw_material_id, branch_id]
+        );
+      } else {
+        await conn.query(
+          `INSERT INTO raw_material_stock
+           (raw_material_id, branch_id, quantity, last_updated_at)
+           VALUES (?,?,?,NOW())`,
+          [item.raw_material_id, branch_id, convertedQuantity]
+        );
+      }
+
+      const amount = item.quantity * item.unit_price;
+      const itemDiscount = item.item_discount || 0;
+
+      let cgstAmount = 0, sgstAmount = 0, igstAmount = 0;
+      if (item.igst_percent && item.igst_percent > 0) {
+        igstAmount = amount * (item.igst_percent / 100);
+      } else {
+        cgstAmount = amount * ((item.cgst_percent || 0) / 100);
+        sgstAmount = amount * ((item.sgst_percent || 0) / 100);
+      }
+      const totalTax = cgstAmount + sgstAmount + igstAmount;
+      const finalAmount = amount + totalTax - itemDiscount;
+
+      await conn.query(
+        `INSERT INTO stock_purchase_items
+         (
+           purchase_order_id,
+           raw_material_id,
+           branch_id,
+           quantity,
+           unit_id,
+           unit_price,
+           amount,
+           cgst_percent,
+           sgst_percent,
+           igst_percent,
+           cgst_amount,
+           sgst_amount,
+           igst_amount,
+           item_discount,
+           final_amount
+         )
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          purchaseOrderId,
+          item.raw_material_id,
+          branch_id,
+          item.quantity,
+          item.unit_id,
+          item.unit_price,
+          amount,
+          item.cgst_percent || 0,
+          item.sgst_percent || 0,
+          item.igst_percent || 0,
+          cgstAmount,
+          sgstAmount,
+          igstAmount,
+          itemDiscount,
+          finalAmount
+        ]
+      );
+    }
+
+    await conn.commit();
+    res.status(201).json({
+      success: true,
+      message: "Direct purchase recorded successfully",
+      po_number: poNumber
+    });
+
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ success: false, message: err.message });
+  } finally {
+    conn.release();
+  }
+};
