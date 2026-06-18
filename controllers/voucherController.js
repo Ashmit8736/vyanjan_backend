@@ -36,8 +36,10 @@ export const getVouchersController = async (req, res) => {
  * Update voucher status (e.g. from Pending to Received)
  */
 export const updateVoucherStatusController = async (req, res) => {
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
+
   try {
-    const pool = await connectDB();
     const branch_id = req.user.branch_id;
     const { id, status } = req.body;
 
@@ -48,7 +50,26 @@ export const updateVoucherStatusController = async (req, res) => {
       });
     }
 
-    // If marking as Received, set received_at time
+    await conn.beginTransaction();
+
+    // 1. Fetch current status, item_id, and quantity of the voucher
+    const [voucherRows] = await conn.execute(
+      `SELECT item_id, quantity, status FROM vouchers WHERE id = ? AND branch_id = ? FOR UPDATE`,
+      [id, branch_id]
+    );
+
+    if (voucherRows.length === 0) {
+      await conn.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Voucher not found or access denied"
+      });
+    }
+
+    const voucher = voucherRows[0];
+    const currentStatus = voucher.status;
+
+    // 2. Update status and received_at time in vouchers
     let query = `UPDATE vouchers SET status = ?`;
     const params = [status];
 
@@ -61,26 +82,51 @@ export const updateVoucherStatusController = async (req, res) => {
     query += ` WHERE id = ? AND branch_id = ?`;
     params.push(id, branch_id);
 
-    const [result] = await pool.execute(query, params);
+    await conn.execute(query, params);
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Voucher not found or access denied"
-      });
+    // 3. Handle items stock adjustments based on status transitions
+    if (voucher.item_id) {
+      const qty = Number(voucher.quantity || 0);
+
+      if (currentStatus !== "Received" && status === "Received") {
+        // Transition: Not Received -> Received => Add stock
+        await conn.execute(
+          `UPDATE items 
+           SET original_qty = original_qty + ?, 
+               remaining_qty = remaining_qty + ?,
+               stock_status = CASE WHEN remaining_qty + ? > 0 AND stock_status = 'Out of Stock' THEN 'In Stock' ELSE stock_status END
+           WHERE id = ?`,
+          [qty, qty, qty, voucher.item_id]
+        );
+      } else if (currentStatus === "Received" && status !== "Received") {
+        // Transition: Received -> Not Received => Deduct stock (revert)
+        await conn.execute(
+          `UPDATE items 
+           SET original_qty = GREATEST(0, original_qty - ?), 
+               remaining_qty = remaining_qty - ?,
+               stock_status = CASE WHEN remaining_qty - ? <= 0 AND stock_status != 'Do Not Track' THEN 'Out of Stock' ELSE stock_status END
+           WHERE id = ?`,
+          [qty, qty, qty, voucher.item_id]
+        );
+      }
     }
+
+    await conn.commit();
 
     res.status(200).json({
       success: true,
       message: `Voucher status updated to ${status} successfully`
     });
   } catch (error) {
+    await conn.rollback();
     console.error("❌ Update Voucher Status Error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to update voucher status",
       error: error.message
     });
+  } finally {
+    conn.release();
   }
 };
 
@@ -143,6 +189,18 @@ export const importVouchersController = async (req, res) => {
           status === "Received" ? new Date() : null
         ]
       );
+
+      // If status is Received, update the item's original_qty and remaining_qty
+      if (status === "Received" && item_id) {
+        await conn.execute(
+          `UPDATE items 
+           SET original_qty = original_qty + ?, 
+               remaining_qty = remaining_qty + ?,
+               stock_status = CASE WHEN remaining_qty + ? > 0 AND stock_status = 'Out of Stock' THEN 'In Stock' ELSE stock_status END
+           WHERE id = ?`,
+          [qty, qty, qty, item_id]
+        );
+      }
     }
 
     await conn.commit();
@@ -222,6 +280,18 @@ export const createVoucherController = async (req, res) => {
         voucherStatus === "Received" ? new Date() : null
       ]
     );
+
+    // If status is Received, update the item's original_qty and remaining_qty
+    if (voucherStatus === "Received" && item_id) {
+      await conn.execute(
+        `UPDATE items 
+         SET original_qty = original_qty + ?, 
+             remaining_qty = remaining_qty + ?,
+             stock_status = CASE WHEN remaining_qty + ? > 0 AND stock_status = 'Out of Stock' THEN 'In Stock' ELSE stock_status END
+         WHERE id = ?`,
+        [qty, qty, qty, item_id]
+      );
+    }
 
     await conn.commit();
     res.status(201).json({

@@ -1,4 +1,5 @@
 import connectDB from "../config/db.js";
+import { sendInvoiceNotification } from "../utils/notification.js";
 
 export const createSalesInvoiceController = async (req, res) => {
   const pool = await connectDB();
@@ -38,13 +39,49 @@ export const createSalesInvoiceController = async (req, res) => {
       kot_number,
       total_amount,
       items,
-      total
+      total,
+      client_name,
+      customer_mobile,
+      customer_location,
+      whatsapp_enabled,
+      notification_method,
+      payment_mode,
+      subtotal,
+      gst,
+      cgst,
+      sgst,
+      table_id,
+      table_number,
+      status
     } = req.body;
 
     const invoiceNumber = invoice_number || await generateInvoiceNumber();
     const tokenNumber = token_number || await generateTokenNumber();
     const invoiceTotal = total_amount ?? total;
     const kotNumber = kot_number || tokenNumber || invoiceNumber || "NA";
+
+    // 1. Resolve or Create Customer
+    let customerId = 0;
+    if (customer_mobile) {
+      const [existingCust] = await conn.execute(
+        `SELECT id FROM customers WHERE mobile_number = ? LIMIT 1`,
+        [customer_mobile]
+      );
+      if (existingCust.length > 0) {
+        customerId = existingCust[0].id;
+        await conn.execute(
+          `UPDATE customers SET customer_name = ?, address = ? WHERE id = ?`,
+          [client_name || 'Walk-In Customer', customer_location || '', customerId]
+        );
+      } else {
+        const [insertCust] = await conn.execute(
+          `INSERT INTO customers (customer_name, mobile_number, address, whatsapp_enabled, customer_type)
+           VALUES (?, ?, ?, ?, 'Regular')`,
+          [client_name || 'Walk-In Customer', customer_mobile, customer_location || '', whatsapp_enabled !== undefined ? whatsapp_enabled : 1]
+        );
+        customerId = insertCust.insertId;
+      }
+    }
 
     if (!invoiceNumber || !tokenNumber || !items || !items.length) {
       return res.status(400).json({
@@ -70,13 +107,44 @@ export const createSalesInvoiceController = async (req, res) => {
       });
     }
 
+    const invoiceSubtotal = subtotal ?? (invoiceTotal ? (Number(invoiceTotal) / 1.18) : 0);
+    const invoiceGst = gst ?? (invoiceTotal ? (Number(invoiceTotal) - Number(invoiceSubtotal)) : 0);
+    const invoiceCgst = cgst ?? (invoiceGst / 2);
+    const invoiceSgst = sgst ?? (invoiceGst / 2);
+    const invoicePaymentMode = payment_mode || 'Cash';
+
+    const invoiceStatus = status || 'paid';
+
     const [invoiceResult] = await conn.execute(
-      `INSERT INTO invoices (invoice_number, token_number, kot_number, total_amount)
-       VALUES (?, ?, ?, ?)`,
-      [invoiceNumber, tokenNumber, kotNumber, invoiceTotal ?? 0]
+      `INSERT INTO invoices (invoice_number, token_number, kot_number, total_amount, customer_id, branch_id, table_id, table_number, subtotal, gst, cgst, sgst, payment_mode, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        invoiceNumber,
+        tokenNumber,
+        kotNumber,
+        invoiceTotal ?? 0,
+        customerId,
+        branch_id,
+        table_id || null,
+        table_number || null,
+        Number(invoiceSubtotal).toFixed(2),
+        Number(invoiceGst).toFixed(2),
+        Number(invoiceCgst).toFixed(2),
+        Number(invoiceSgst).toFixed(2),
+        invoicePaymentMode,
+        invoiceStatus
+      ]
     );
 
     const invoiceId = invoiceResult.insertId;
+
+    if (table_id) {
+      const targetTableStatus = invoiceStatus;
+      await conn.execute(
+        `UPDATE tables SET status = ?, updated_at = NOW() WHERE id = ?`,
+        [targetTableStatus, table_id]
+      );
+    }
 
     for (const item of items) {
       const itemQty = Number(item.qty ?? item.quantity ?? 0);
@@ -101,6 +169,15 @@ export const createSalesInvoiceController = async (req, res) => {
         `INSERT INTO invoice_items (invoice_id, item_id, quantity, price, subtotal)
          VALUES (?, ?, ?, ?, ?)`,
         [invoiceId, itemId, itemQty, itemPrice, itemSubtotal]
+      );
+
+      // Deduct sold quantity from the items table remaining_qty
+      await conn.execute(
+        `UPDATE items 
+         SET remaining_qty = remaining_qty - ?,
+             stock_status = CASE WHEN remaining_qty - ? <= 0 AND stock_status != 'Do Not Track' THEN 'Out of Stock' ELSE stock_status END
+         WHERE id = ?`,
+        [itemQty, itemQty, itemId]
       );
 
       // 2.1 Deduct from Received vouchers of this item (FIFO)
@@ -182,7 +259,38 @@ export const createSalesInvoiceController = async (req, res) => {
       }
     }
 
+    // Fetch branch name for dynamic branding before committing
+    let resolvedBranchName = "Vyanjan";
+    if (branch_id) {
+      try {
+        const [[branchRow]] = await conn.execute(
+          `SELECT branch_name FROM branch WHERE branch_id = ? LIMIT 1`,
+          [branch_id]
+        );
+        if (branchRow && branchRow.branch_name) {
+          resolvedBranchName = branchRow.branch_name;
+        }
+      } catch (err) {
+        console.error("Error fetching branch name for notification:", err);
+      }
+    }
+
     await conn.commit();
+
+    // Trigger notification asynchronously in the background
+    const notificationMethod = notification_method || (whatsapp_enabled ? "WhatsApp" : "None");
+    if (notificationMethod !== "None" && customer_mobile) {
+      sendInvoiceNotification({
+        invoiceNumber,
+        customerName: client_name || "Customer",
+        customerMobile: customer_mobile,
+        totalAmount: invoiceTotal ?? 0,
+        notificationMethod,
+        branchName: resolvedBranchName
+      }).catch((err) => {
+        console.error("Error sending invoice notification in background:", err);
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -215,7 +323,7 @@ export const getSalesInvoicesController = async (req, res) => {
     const pool = await connectDB();
 
     const [rows] = await pool.execute(
-      `SELECT id, invoice_number, token_number, kot_number, '' As client_name,
+      `SELECT id, invoice_number, token_number, kot_number, ' ' AS client_name,
               total_amount AS amount,
               DATE_FORMAT(created_at, '%d-%m-%Y') AS date,
               COALESCE(status, 'Paid') AS status
@@ -271,5 +379,286 @@ export const getSalesDashboardStatsController = async (req, res) => {
       message: "Failed to fetch dashboard stats",
       error: error.message
     });
+  }
+};
+
+export const getInvoiceDetailsController = async (req, res) => {
+  const { invoiceNumber } = req.params;
+  try {
+    const pool = await connectDB();
+    
+    const [invoices] = await pool.execute(
+      `SELECT i.id, i.invoice_number, i.token_number, i.kot_number, i.total_amount, 
+              i.subtotal, i.gst, i.cgst, i.sgst, i.payment_mode, i.created_at, i.customer_id,
+              i.table_id, i.table_number,
+              c.customer_name, c.mobile_number, c.address AS customer_location,
+              b.branch_name, b.address AS branch_address, b.primary_no AS branch_phone, b.gst_no AS branch_gst
+       FROM invoices i
+       LEFT JOIN customers c ON i.customer_id = c.id
+       LEFT JOIN branch b ON i.branch_id = b.branch_id
+       WHERE i.invoice_number = ? OR i.id = ? LIMIT 1`,
+      [invoiceNumber, invoiceNumber]
+    );
+
+    if (!invoices.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Invoice not found"
+      });
+    }
+
+    const invoice = invoices[0];
+
+    const [items] = await pool.execute(
+      `SELECT ii.quantity, ii.price, ii.subtotal, item.name, item.category
+       FROM invoice_items ii
+       JOIN items item ON ii.item_id = item.id
+       WHERE ii.invoice_id = ?`,
+      [invoice.id]
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...invoice,
+        items
+      }
+    });
+  } catch (error) {
+    console.error("❌ Fetch Invoice Details Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch invoice details",
+      error: error.message
+    });
+  }
+};
+
+export const updateInvoiceStatusController = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!id) {
+    return res.status(400).json({ success: false, message: "Invoice ID is required" });
+  }
+  if (!status) {
+    return res.status(400).json({ success: false, message: "Status is required" });
+  }
+
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    // Fetch the invoice to see if it has a table_id
+    const [invoices] = await conn.execute(
+      `SELECT table_id FROM invoices WHERE id = ? OR invoice_number = ? LIMIT 1`,
+      [id, id]
+    );
+
+    if (invoices.length === 0) {
+      await conn.rollback();
+      return res.status(404).json({ success: false, message: "Invoice not found" });
+    }
+
+    const invoice = invoices[0];
+
+    // Update invoice status
+    await conn.execute(
+      `UPDATE invoices SET status = ?, updated_at = NOW() WHERE id = ? OR invoice_number = ?`,
+      [status, id, id]
+    );
+
+    // If invoice is linked to a table, update table status
+    if (invoice.table_id) {
+      const targetTableStatus = status;
+      await conn.execute(
+        `UPDATE tables SET status = ?, updated_at = NOW() WHERE id = ?`,
+        [targetTableStatus, invoice.table_id]
+      );
+    }
+
+    await conn.commit();
+    res.status(200).json({ success: true, message: `Invoice status updated to ${status} successfully` });
+  } catch (error) {
+    await conn.rollback();
+    console.error("Error updating invoice status:", error);
+    res.status(500).json({ success: false, message: "Failed to update invoice status", error: error.message });
+  } finally {
+    conn.release();
+  }
+};
+
+export const updateSalesInvoiceController = async (req, res) => {
+  const { invoiceNumber } = req.params;
+  const pool = await connectDB();
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const branch_id = req.user?.branch_id || null;
+    const {
+      total_amount,
+      items,
+      subtotal,
+      gst,
+      cgst,
+      sgst,
+      payment_mode,
+      table_id,
+      table_number,
+      status,
+      client_name,
+      customer_mobile,
+      customer_location
+    } = req.body;
+
+    const [invoices] = await conn.execute(
+      `SELECT id, customer_id FROM invoices WHERE invoice_number = ? LIMIT 1`,
+      [invoiceNumber]
+    );
+
+    if (invoices.length === 0) {
+      await conn.rollback();
+      return res.status(404).json({ success: false, message: "Invoice not found" });
+    }
+
+    const invoiceId = invoices[0].id;
+    let customerId = invoices[0].customer_id;
+
+    if (customer_mobile) {
+      const [existingCust] = await conn.execute(
+        `SELECT id FROM customers WHERE mobile_number = ? LIMIT 1`,
+        [customer_mobile]
+      );
+      if (existingCust.length > 0) {
+        customerId = existingCust[0].id;
+        await conn.execute(
+          `UPDATE customers SET customer_name = ?, address = ? WHERE id = ?`,
+          [client_name || 'Walk-In Customer', customer_location || '', customerId]
+        );
+      } else {
+        const [insertCust] = await conn.execute(
+          `INSERT INTO customers (customer_name, mobile_number, address, whatsapp_enabled, customer_type)
+           VALUES (?, ?, ?, 1, 'Regular')`,
+          [client_name || 'Walk-In Customer', customer_mobile, customer_location || '']
+        );
+        customerId = insertCust.insertId;
+      }
+    }
+
+    // Fetch old items to restore remaining_qty
+    const [oldItems] = await conn.execute(
+      `SELECT item_id, quantity FROM invoice_items WHERE invoice_id = ?`,
+      [invoiceId]
+    );
+
+    for (const oldItem of oldItems) {
+      await conn.execute(
+        `UPDATE items 
+         SET remaining_qty = remaining_qty + ?,
+             stock_status = CASE WHEN remaining_qty + ? > 0 AND stock_status = 'Out of Stock' THEN 'In Stock' ELSE stock_status END
+         WHERE id = ?`,
+        [Number(oldItem.quantity), Number(oldItem.quantity), oldItem.item_id]
+      );
+    }
+
+    await conn.execute(
+      `DELETE FROM invoice_items WHERE invoice_id = ?`,
+      [invoiceId]
+    );
+
+    const invoiceTotal = total_amount;
+    const invoiceSubtotal = subtotal ?? (invoiceTotal ? (Number(invoiceTotal) / 1.18) : 0);
+    const invoiceGst = gst ?? (invoiceTotal ? (Number(invoiceTotal) - Number(invoiceSubtotal)) : 0);
+    const invoiceCgst = cgst ?? (invoiceGst / 2);
+    const invoiceSgst = sgst ?? (invoiceGst / 2);
+    const invoicePaymentMode = payment_mode || 'Cash';
+    const invoiceStatus = status || 'running';
+
+    await conn.execute(
+      `UPDATE invoices 
+       SET total_amount = ?, customer_id = ?, table_id = ?, table_number = ?, 
+           subtotal = ?, gst = ?, cgst = ?, sgst = ?, payment_mode = ?, status = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [
+        invoiceTotal ?? 0,
+        customerId || null,
+        table_id || null,
+        table_number || null,
+        Number(invoiceSubtotal).toFixed(2),
+        Number(invoiceGst).toFixed(2),
+        Number(invoiceCgst).toFixed(2),
+        Number(invoiceSgst).toFixed(2),
+        invoicePaymentMode,
+        invoiceStatus,
+        invoiceId
+      ]
+    );
+
+    for (const item of items) {
+      const itemQty = Number(item.qty ?? item.quantity ?? 0);
+      const itemPrice = Number(item.price ?? 0);
+      const itemSubtotal = Number((itemQty * itemPrice).toFixed(2));
+      let itemId = item.item_id || item.id || null;
+
+      if (!itemId) {
+        const [itemRows] = await conn.execute(
+          `SELECT id FROM items WHERE name = ? AND is_active = 1 ${branch_id ? "AND branch_id = ?" : ""} LIMIT 1`,
+          branch_id ? [item.name, branch_id] : [item.name]
+        );
+
+        if (!itemRows.length) {
+          throw new Error(`Item not found: ${item.name}`);
+        }
+        itemId = itemRows[0].id;
+      }
+
+      await conn.execute(
+        `INSERT INTO invoice_items (invoice_id, item_id, quantity, price, subtotal)
+         VALUES (?, ?, ?, ?, ?)`,
+        [invoiceId, itemId, itemQty, itemPrice, itemSubtotal]
+      );
+
+      // Deduct sold quantity from the items table remaining_qty
+      await conn.execute(
+        `UPDATE items 
+         SET remaining_qty = remaining_qty - ?,
+             stock_status = CASE WHEN remaining_qty - ? <= 0 AND stock_status != 'Do Not Track' THEN 'Out of Stock' ELSE stock_status END
+         WHERE id = ?`,
+        [itemQty, itemQty, itemId]
+      );
+    }
+
+    if (table_id) {
+      const targetTableStatus = invoiceStatus;
+      await conn.execute(
+        `UPDATE tables SET status = ?, updated_at = NOW() WHERE id = ?`,
+        [targetTableStatus, table_id]
+      );
+    }
+
+    await conn.commit();
+    res.status(200).json({
+      success: true,
+      message: "Invoice updated successfully",
+      data: {
+        invoice_id: invoiceId,
+        invoice_number: invoiceNumber,
+        total_amount: invoiceTotal ?? 0
+      }
+    });
+  } catch (error) {
+    await conn.rollback();
+    console.error("❌ Update Invoice Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update invoice",
+      error: error.message
+    });
+  } finally {
+    conn.release();
   }
 };
