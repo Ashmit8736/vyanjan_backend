@@ -9,12 +9,15 @@ export const getVouchersController = async (req, res) => {
     const branch_id = req.user.branch_id;
 
     const [rows] = await pool.execute(
-      `SELECT id, item_id, item_name, quantity, remaining_quantity, status,
-              DATE_FORMAT(created_at, '%d-%m-%Y %h:%i %p') AS created_at,
-              DATE_FORMAT(received_at, '%d-%m-%Y %h:%i %p') AS received_at
-       FROM vouchers
-       WHERE branch_id = ?
-       ORDER BY id DESC`,
+      `SELECT v.id, v.item_id, v.item_name, v.quantity, v.remaining_quantity, v.status,
+              u.unit_symbol AS unit,
+              DATE_FORMAT(v.created_at, '%d-%m-%Y %h:%i %p') AS created_at,
+              DATE_FORMAT(v.received_at, '%d-%m-%Y %h:%i %p') AS received_at
+       FROM vouchers v
+       LEFT JOIN items i ON v.item_id = i.id
+       LEFT JOIN units u ON i.item_unit_id = u.id
+       WHERE v.branch_id = ?
+       ORDER BY v.id DESC`,
       [branch_id]
     );
 
