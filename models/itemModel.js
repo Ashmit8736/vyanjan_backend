@@ -50,6 +50,22 @@ export const createItem = async (
 export const getItemsByBranch = async (branch_id) => {
   const conn = await connectDB();
 
+  // Find the owner of the current branch
+  const [[branchRow]] = await conn.execute(
+    "SELECT created_by FROM branch WHERE branch_id = ?",
+    [branch_id]
+  );
+  const ownerId = branchRow ? branchRow.created_by : null;
+
+  let centralBranchId = null;
+  if (ownerId) {
+    const [[centralRow]] = await conn.execute(
+      "SELECT branch_id FROM branch WHERE created_by = ? AND branch_name = 'Central Warehouse' LIMIT 1",
+      [ownerId]
+    );
+    centralBranchId = centralRow ? centralRow.branch_id : null;
+  }
+
   const [rows] = await conn.execute(
     `SELECT 
         i.id,
@@ -62,10 +78,11 @@ export const getItemsByBranch = async (branch_id) => {
         i.favorite,
         i.original_qty,
         i.remaining_qty,
+        i.branch_id,
 
         r.id            AS recipe_id,
         r.item_quantity,
-        r.item_unit_id  AS recipe_unit_id,   -- ✅ REQUIRED
+        r.item_unit_id  AS recipe_unit_id,
 
         u.unit_name     AS item_unit_name,
         u.unit_symbol   AS item_unit_symbol,
@@ -85,11 +102,11 @@ export const getItemsByBranch = async (branch_id) => {
      LEFT JOIN units ru
        ON ru.id = r.item_unit_id
 
-     WHERE i.branch_id = ?
+     WHERE (i.branch_id = ? OR (? IS NOT NULL AND i.branch_id = ?))
        AND i.is_active = 1
 
      ORDER BY i.favorite DESC, i.id DESC`,
-    [branch_id]
+    [branch_id, centralBranchId, centralBranchId]
   );
 
   return rows;

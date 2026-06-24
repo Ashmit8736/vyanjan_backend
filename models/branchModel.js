@@ -26,9 +26,16 @@ export const createBranch = async (data) => {
 export const getBranchesByUser = async (userId) => {
   const db = await connectDB();
 
+  // Check if user is a branch user (has a branch_id and created_by)
+  const [userRows] = await db.query("SELECT branch_id, created_by FROM users WHERE id = ?", [userId]);
+  let ownerId = userId;
+  if (userRows.length > 0 && userRows[0].branch_id !== null && userRows[0].created_by !== null) {
+    ownerId = userRows[0].created_by;
+  }
+
   const [rows] = await db.query(
     "SELECT * FROM branch WHERE user_id = ? ORDER BY created_at DESC",
-    [userId]
+    [ownerId]
   );
 
   return rows;

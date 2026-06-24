@@ -171,6 +171,7 @@ export const getUsersCreatedByOwner = async (ownerId) => {
       u.phone,
       u.role,
       u.is_active,
+      u.branch_id,
       b.branch_name
     FROM users u
     JOIN branch b ON b.branch_id = u.branch_id

@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import connectDB from "../config/db.js";
 import {
   createUser,
   findUserByEmailOrPhone,
@@ -50,7 +51,7 @@ export const registerUser = async (req, res) => {
       email,
       phone,
       password: hashedPassword,
-      store_count: store_count || 1,
+      store_count: store_count || 2,
       gst_number: gst_number || null,
       shop_name,
       address,
@@ -156,7 +157,7 @@ export const getUserBranchStats = async (req, res) => {
 
     res.json({
       success: true,
-      store_count: stats.store_count,
+      store_count: Math.max(stats.store_count || 0, 2),
       created_branches_count: stats.created_branches_count
     });
   } catch (err) {
@@ -196,6 +197,18 @@ export const addBranchUser = async (req, res) => {
       });
     }
 
+    let final_branch_id = branch_id;
+    if (role === 'inventory') {
+      const db = await connectDB();
+      const [rows] = await db.query("SELECT branch_id FROM branch WHERE user_id = ? AND branch_name = 'Central Warehouse' LIMIT 1", [ownerId]);
+      if (rows.length > 0) {
+        final_branch_id = rows[0].branch_id;
+      } else {
+        const [result] = await db.query("INSERT INTO branch (user_id, created_by, branch_name, license_no, gst_no, email, address, city, state, pincode, primary_no, secondary_no) VALUES (?, ?, 'Central Warehouse', 'N/A', 'N/A', 'central@inventory.com', 'Central', 'N/A', 'N/A', '000000', '0000000000', '0000000000')", [ownerId, ownerId]);
+        final_branch_id = result.insertId;
+      }
+    }
+
     // 🔑 Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -204,7 +217,7 @@ export const addBranchUser = async (req, res) => {
       email,
       phone,
       hashedPassword,
-      branch_id,
+      final_branch_id,
       ownerId,     // created_by
       role,
       1            // is_active
@@ -215,6 +228,9 @@ export const addBranchUser = async (req, res) => {
     });
 
   } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: "A user with this phone number or email already exists." });
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -241,7 +257,15 @@ export const getBranchUsers = async (req, res) => {
 
 export const getOwnerUsers = async (req, res) => {
   try {
-    const ownerId = req.user.id; // auth middleware se
+    const userId = req.user.id; // auth middleware se
+
+    const db = await connectDB();
+    const [rows] = await db.query("SELECT created_by FROM users WHERE id = ?", [userId]);
+    
+    let ownerId = userId;
+    if (rows.length > 0 && rows[0].created_by) {
+      ownerId = rows[0].created_by;
+    }
 
     const users = await getUsersCreatedByOwner(ownerId);
 

@@ -18,6 +18,7 @@ import wastageRoutes from "./routes/wastageRoutes.js";
 import voucherRoutes from "./routes/voucherRoutes.js";
 import diningRoutes from "./routes/diningRoutes.js";
 import itemWastageRoutes from "./routes/itemWastageRoutes.js";
+import stockTransferRoutes from "./routes/stockTransferRoutes.js";
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api/stock", StockRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/purchaseOrders", purchaseOrderRoutes);
 app.use("/api/stockPurchaseItems", stockPurchaseItemRoutes);
+app.use("/api/stockTransfer", stockTransferRoutes);
 
 app.use("/api/item", itemRoutes);
 app.use("/api/recipe", recipeRoutes);

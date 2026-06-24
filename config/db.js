@@ -13,7 +13,8 @@ const connectDB = async () => {
       connectionLimit: 15,
       queueLimit: 0,
       enableKeepAlive: true,
-      keepAliveInitialDelay: 10000
+      keepAliveInitialDelay: 10000,
+      timezone: '+05:30'
     });
 
     console.log("✅ MariaDB Connection Pool Created Successfully");

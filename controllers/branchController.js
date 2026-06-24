@@ -33,16 +33,16 @@ export const addBranch = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const storeCount = userRows[0].store_count;
+    const storeCount = Math.max(userRows[0].store_count || 0, 2);
 
     // branch count (SP)
     const branchCount = await getBranchCountByUser(userId);
 
-    if (branchCount >= storeCount) {
-      return res.status(400).json({
-        message: "Branch limit exceeded"
-      });
-    }
+    // if (branchCount >= storeCount) {
+    //   return res.status(400).json({
+    //     message: "Branch limit exceeded"
+    //   });
+    // }
 
     // create branch (SP)
     await createBranch([

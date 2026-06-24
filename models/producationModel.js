@@ -3,6 +3,7 @@ import connectDB from "../config/db.js";
 
 export const createProduction = async ({
     branch_id,
+    target_branch_id,
     item_id,
     recipe_id,
     produce_quantity,
@@ -128,9 +129,9 @@ export const createProduction = async ({
         }
 
         await conn.execute(
-            `INSERT INTO vouchers (id, branch_id, item_id, item_name, quantity, remaining_quantity, status)
-             VALUES (?, ?, ?, ?, ?, ?, 'Pending')`,
-            [randomVoucherId, branch_id, item_id, itemName, produce_quantity, produce_quantity]
+            `INSERT INTO vouchers (id, branch_id, item_id, item_name, quantity, remaining_quantity, status, sender_branch_id)
+             VALUES (?, ?, ?, ?, ?, ?, 'Pending', ?)`,
+            [randomVoucherId, target_branch_id || branch_id, item_id, itemName, produce_quantity, produce_quantity, branch_id]
         );
 
         /* 6️⃣ Deduct stock + insert production_materials */
